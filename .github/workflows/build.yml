@@ -36,10 +36,14 @@ jobs:
           path: |
             TestResults
             TEST-REPORT.md
-      - name: Publish GitHub Release (tags only)
-        if: startsWith(github.ref, 'refs/tags/v')
+      - name: Publish GitHub Release (main only)
+        if: github.ref == 'refs/heads/main' && github.event_name == 'push'
         shell: pwsh
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
-          gh release create "${{ github.ref_name }}" release/*.zip --title "WMT ${{ github.ref_name }}" --notes "Self-contained Windows x64 build. Unzip, then double-click Launch-WMT.cmd. See README.txt inside. M1 = discovery only (no backup/restore)."
+          $tag = 'v3.0.0-m1'
+          gh release delete $tag --yes --cleanup-tag 2>$null
+          $global:LASTEXITCODE = 0
+          gh release create $tag release/*.zip --target "${{ github.sha }}" --title "WMT $tag" --notes "Self-contained Windows x64 build. Unzip, then double-click Launch-WMT.cmd. See README.txt inside. M1 = discovery only (no backup/restore). Built from commit ${{ github.sha }}."
+          if ($LASTEXITCODE -ne 0) { throw 'release failed' }
