@@ -1,0 +1,34 @@
+name: build
+on:
+  push:
+  pull_request:
+  workflow_dispatch:
+jobs:
+  build:
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: '8.0.x'
+      - name: Test
+        shell: pwsh
+        run: dotnet test tests/WMT.Tests -c Release --logger "trx;LogFileName=results.trx" --results-directory TestResults
+      - name: Test report
+        if: always()
+        shell: pwsh
+        run: ./build/New-TestReport.ps1 -Trx TestResults/results.trx -Out TEST-REPORT.md
+      - name: Release (self-contained EXE)
+        shell: pwsh
+        run: ./build/Build-Release.ps1
+      - uses: actions/upload-artifact@v4
+        with:
+          name: WMT-v3.0.0-m1
+          path: release/*.zip
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: test-results
+          path: |
+            TestResults
+            TEST-REPORT.md
