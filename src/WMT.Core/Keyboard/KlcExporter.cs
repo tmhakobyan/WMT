@@ -94,20 +94,19 @@ public static class KlcExporter
             if (pChars == IntPtr.Zero) break;
             int nMods = Marshal.ReadByte(entry, ps), cb = Marshal.ReadByte(entry, ps + 1);
             if (cb < 2 || nMods == 0) continue;
+            ushort[] ReadChars(int row) => Enumerable.Range(0, nMods).Select(k => (ushort)Marshal.ReadInt16(pChars + row * cb, 2 + 2 * k)).ToArray();
             for (int i = 0; ; i++)
             {
                 var r = pChars + i * cb;
                 int vk = Marshal.ReadByte(r, 0);
                 if (vk == 0) break;
-                if (vk == 0xFF) continue; // follow-up row consumed below
+                if (vk == 0xFF) continue; // follow-up row of a dead key
                 byte attr = Marshal.ReadByte(r, 1);
-                var chars = Enumerable.Range(0, nMods).Select(k => (ushort)Marshal.ReadInt16(r, 2 + 2 * k)).ToArray();
+                var chars = ReadChars(i);
                 ushort[]? dead = null, sg = null;
-                int next = i + 1;
-                if (chars.Contains(WCH_DEAD) && Marshal.ReadByte(pChars + next * cb, 0) == 0xFF)
-                { dead = Enumerable.Range(0, nMods).Select(k => (ushort)Marshal.ReadInt16(pChars + next * cb, 2 + 2 * k)).ToArray(); next++; }
-                if ((attr & SGCAPS) != 0 && Marshal.ReadByte(pChars + next * cb, 0) == 0xFF)
-                    sg = Enumerable.Range(0, nMods).Select(k => (ushort)Marshal.ReadInt16(pChars + next * cb, 2 + 2 * k)).ToArray();
+                // SGCAPS: the next entry always holds the Caps Lock characters (Windows takes it whatever its VK byte is).
+                if ((attr & SGCAPS) != 0 && Marshal.ReadByte(pChars + (i + 1) * cb, 0) != 0) { sg = ReadChars(i + 1); i++; }
+                if (chars.Contains(WCH_DEAD) && Marshal.ReadByte(pChars + (i + 1) * cb, 0) == 0xFF) { dead = ReadChars(i + 1); i++; }
                 if (!vkToSc.TryGetValue(vk, out var sc)) continue;
                 rows.Add((sc, vk, attr, chars, dead, sg));
             }
@@ -192,7 +191,7 @@ public static class KlcExporter
         }
 
         // ---- dead keys
-        int deadCount = 0;
+        int deadCount = 0, chained = 0;
         if (pDead != IntPtr.Zero)
         {
             var groups = new List<(int Accent, List<string> Lines)>();
@@ -205,9 +204,11 @@ public static class KlcExporter
                 int composed = (ushort)Marshal.ReadInt16(e, 4), dkf = (ushort)Marshal.ReadInt16(e, 6);
                 var g = groups.FirstOrDefault(x => x.Accent == accent);
                 if (g.Lines == null) { g = (accent, new List<string>()); groups.Add(g); }
-                g.Lines.Add($"{Hex(baseCh)}\t{Hex(composed)}{((dkf & 1) != 0 ? "@" : "")}");
+                g.Lines.Add($"{Hex(baseCh)}\t{Hex(composed)}");
+                if ((dkf & 1) != 0) chained++;
                 deadCount++;
             }
+            if (chained > 0) warnings.Add($"{chained} chained dead-key entries were written as plain characters (MSKLC 1.4 cannot express chained dead keys).");
             foreach (var g in groups)
             {
                 L($"DEADKEY\t{Hex(g.Accent)}"); L();
@@ -226,6 +227,7 @@ public static class KlcExporter
                 int vsc = Marshal.ReadByte(e, 0);
                 if (vsc == 0) break;
                 var name = WStr(P(e, ps)) ?? "";
+                if (name.Length == 0) continue;
                 lines.Add($"{vsc:x2}\t{(name.Contains(' ') ? Q(name) : name)}");
             }
             if (lines.Count == 0) return;

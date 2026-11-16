@@ -93,7 +93,7 @@ public class KeyboardLayoutTests
     [Fact] public void Klc_generator_failure_is_reported_not_fatal()
     {
         var e = Make(withSources: false, withCache: false);
-        var s = new KeyboardLayoutDiscovery(e.Reg, p => File.Exists(p) ? ("Tigran", "1.0") : null, e.Sys32, e.SysWow) { KlcGenerator = _ => throw new InvalidDataException("bad tables") }
+        var s = new KeyboardLayoutDiscovery(e.Reg, p => File.Exists(p) ? (Path.GetFileName(p).StartsWith("kbdhy") ? "Tigran" : "Microsoft Corporation", "1.0") : null, e.Sys32, e.SysWow) { KlcGenerator = _ => throw new InvalidDataException("bad tables") }
             .Discover(e.Software, new[] { e.Search }, CancellationToken.None);
         var c = s.Layouts.Single(l => l.IsCustom);
         Assert.Equal("bad tables", c.GeneratedKlcError);

@@ -19,3 +19,8 @@ Tested automatically on GitHub Actions (Windows Server). See TEST-REPORT.md for 
 12. The program is not code-signed: Windows SmartScreen may warn on first start ("More info" → "Run anyway").
 13. Recreating Python environments installs packages from PyPI; packages from local files or Git (listed in the plan) need their source.
 14. Python packages are captured per environment; conda-specific packages are not exported in conda format.
+
+## Keyboard layouts (.klc generation)
+- The generated .klc contains everything MSKLC 1.4 can express. Chained dead keys (a dead key that produces another dead key) are written as plain characters, because MSKLC cannot represent them; the layout DLL itself (installed directly by WMT) keeps them.
+- MSKLC's compiler keeps only Latin-1 characters in key *names* (e.g. "ČÁRKA" becomes "ÁRKA"); typing is not affected.
+- Some special hardware layouts shipped with Windows (Japanese 106/NEC, DEC LK411) cannot be compiled by MSKLC from any .klc. This does not apply to layouts created with MSKLC.
