@@ -113,11 +113,10 @@ license keys and activation data were NOT exported.
         if (kbd.Count == 0) { t.AppendLine("  No custom keyboard layouts selected."); h.Append("<p>No custom keyboard layouts selected.</p>"); }
         foreach (var l in kbd)
         {
-            var inst = KeyboardRestore.InstallerInPackage(pkg, l);
-            t.AppendLine($"  {l.LayoutText} ({l.Klid}, {l.Language}): " + (inst != null ? $"run {inst} (Keyboard Layouts tab → Install selected layouts)" : l.KlcSources.Count > 0 ? "rebuild from .klc with MSKLC" : "NO installer — rebuild with MSKLC before wiping Windows 10"));
+            t.AppendLine($"  {l.LayoutText} ({l.Klid}, {l.Language}): {KbdHow(pkg, l)}");
         }
-        h.Append(Table(new[] { "Layout", "KLID", "Language", "Best source", "Installer in package" },
-            kbd.Select(l => new[] { l.LayoutText, l.Klid, l.Language, l.BackupSource, KeyboardRestore.InstallerInPackage(pkg, l) ?? "—" })));
+        h.Append(Table(new[] { "Layout", "KLID", "Language", "Best source", "How it is reinstalled" },
+            kbd.Select(l => new[] { l.LayoutText, l.Klid, l.Language, l.BackupSource, KbdHow(pkg, l) })));
 
         Step("Restore files");
         var cats = pkg.Files.Where(f => f.Selected).GroupBy(f => f.Category).OrderBy(g => g.Key).ToList();
@@ -234,4 +233,10 @@ license keys and activation data were NOT exported.
         (journal != null ? $"<p>Restored {journal.Restored}, failed {journal.Failed}.</p><pre>{H(string.Join("\n", journal.Errors))}</pre>" : "") +
         "<h2>Files</h2>" + Table(new[] { "Action", "Selected", "Target", "From package", "Reason" }, plan.Files.Select(f => new[] { f.Action.ToString(), f.Selected ? "✓" : "", f.Target ?? "", f.PackagePath, f.Reason })) +
         "<h2>Registry</h2>" + Table(new[] { "Selected", "Key", "Value", "Old", "New", "Note" }, plan.Registry.Select(r => new[] { r.Selected ? "✓" : "", "HKCU\\" + r.KeyPath, r.ValueName, r.OldValue ?? "(absent)", r.NewValue ?? string.Join("; ", r.NewMulti ?? new()), (r.Blocked ? "BLOCKED: " : "") + r.Warning })));
+
+    static string KbdHow(LoadedPackage pkg, KeyboardLayoutInfo l) =>
+        KeyboardRestore.InstallerInPackage(pkg, l) is string inst ? $"installer {inst} (Keyboard Layouts tab → Install selected layouts)" :
+        KeyboardRestore.DllsInPackage(pkg, l).Dll64 is string dll ? $"WMT installs the saved DLL {dll} (Keyboard Layouts tab → Install selected layouts; MSKLC not needed)" :
+        KeyboardRestore.KlcInPackage(pkg, l) != null ? "rebuild from .klc: install MSKLC, then Keyboard Layouts tab → Install selected layouts" :
+        "NOTHING to reinstall from — save it as .klc with MSKLC before wiping Windows 10";
 }

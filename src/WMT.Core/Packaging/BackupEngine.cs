@@ -167,6 +167,8 @@ public sealed class BackupEngine
         if (input.WingetExportJson != null) Json.WriteText(l.M("Winget-Export.json"), input.WingetExportJson);
         Json.WriteFile(l.FilesJson, files);
         Json.WriteFile(l.DirectoriesJson, dirs);
+        foreach (var kl in plan.Keyboard?.Layouts.Where(k => k.Selected && k.IsCustom && k.GeneratedKlc != null) ?? Enumerable.Empty<KeyboardLayoutInfo>())
+            Msklc.WriteKlc(Path.Combine(l.Reports, "Keyboard", KeyboardRestore.GeneratedKlcFileName(kl)), kl.GeneratedKlc!);
         var pyDir = Path.Combine(l.Reports, "Python");
         foreach (var env in plan.Python?.Environments ?? new())
         {

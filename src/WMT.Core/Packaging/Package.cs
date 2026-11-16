@@ -6,7 +6,7 @@ namespace WMT.Core;
 public static class Toolkit
 {
     public static string Version =>
-        typeof(Toolkit).Assembly.GetCustomAttribute<AssemblyInformationalVersionAttribute>()?.InformationalVersion?.Split('+')[0] ?? "4.0.0";
+        typeof(Toolkit).Assembly.GetCustomAttribute<AssemblyInformationalVersionAttribute>()?.InformationalVersion?.Split('+')[0] ?? "4.1.0";
     public static string BuildId => Environment.GetEnvironmentVariable("WMT_BUILD_ID") ?? (typeof(Toolkit).Assembly.GetCustomAttribute<AssemblyInformationalVersionAttribute>()?.InformationalVersion ?? "");
     public const string IntegrityNote = "SHA-256 values are integrity checksums, not digital signatures. They detect accidental or intentional changes only when compared with a trusted copy of the manifests.";
 }

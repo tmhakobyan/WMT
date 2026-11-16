@@ -6,7 +6,7 @@ on:
 permissions:
   contents: write
 env:
-  WMT_VERSION: 4.0.0-beta
+  WMT_VERSION: 4.1.0-beta
 jobs:
   build:
     runs-on: windows-latest
@@ -17,9 +17,28 @@ jobs:
         with:
           dotnet-version: '8.0.x'
 
+      - name: Get MSKLC compiler (only for the .klc round-trip test)
+        continue-on-error: true
+        shell: pwsh
+        run: |
+          $exe = "$env:RUNNER_TEMP\MSKLC.exe"
+          Invoke-WebRequest 'https://download.microsoft.com/download/6/f/5/6f5ce43a-e892-4fd1-b9a6-1a0cbb64e6e2/MSKLC.exe' -OutFile $exe
+          $h = (Get-FileHash $exe -Algorithm SHA256).Hash
+          if ($h -ne 'CD12A6B08066133DC4AD71BDCACCF1492E3D9A1DE93CF84B7B2824309F0D7255') { throw "unexpected MSKLC.exe hash $h" }
+          7z x $exe -o"$env:RUNNER_TEMP\msklc-x" -y | Out-Null
+          $msi = Get-ChildItem "$env:RUNNER_TEMP\msklc-x" -Recurse -Filter *.msi | Select-Object -First 1
+          $dir = "$env:RUNNER_TEMP\msklc"
+          Start-Process msiexec.exe -ArgumentList '/a', "`"$($msi.FullName)`"", '/qn', "TARGETDIR=`"$dir`"" -Wait
+          $tool = Get-ChildItem $dir -Recurse -Filter kbdutool.exe | Select-Object -First 1
+          if (-not $tool) { Get-ChildItem $dir -Recurse | Select-Object -First 50 FullName | Format-Table -AutoSize | Out-String | Write-Host; throw 'kbdutool.exe not found' }
+          Write-Host "kbdutool: $($tool.FullName)"
+          "WMT_MSKLC_DIR=$dir" | Out-File -FilePath $env:GITHUB_ENV -Append -Encoding utf8
+
       - name: Automated tests (xunit)
         id: tests
         shell: pwsh
+        env:
+          WMT_ADMIN_TESTS: '1'
         run: dotnet test tests/WMT.Tests -c Release --logger "trx;LogFileName=results.trx" --logger "console;verbosity=normal" --results-directory TestResults
 
       - name: Build self-contained release
@@ -34,6 +53,12 @@ jobs:
         shell: pwsh
         run: ./build/Run-SelfTest.ps1 -Exe "release/WMT-$env:WMT_VERSION/WMT.exe" -OutDir "$PWD/selftest-out"
 
+      - name: Keyboard DLL sweep (.klc export of every Windows layout, MSKLC round trip)
+        continue-on-error: true
+        if: always() && steps.release.outcome == 'success'
+        shell: pwsh
+        run: ./build/Klc-Sweep.ps1 -Cli "release/WMT-$env:WMT_VERSION/wmt-cli.exe" -Out "$PWD/klc-sweep"
+
       - name: Test report and evidence
         if: always()
         shell: pwsh
@@ -45,6 +70,7 @@ jobs:
           if (Test-Path selftest-out/screenshots) { Copy-Item selftest-out/screenshots evidence/ -Recurse }
           if (Test-Path selftest-out/selftest.json) { Copy-Item selftest-out/selftest.json evidence/ }
           if (Test-Path selftest-out/selftest-activity.log) { Copy-Item selftest-out/selftest-activity.log evidence/ }
+          if (Test-Path klc-sweep) { Copy-Item klc-sweep evidence/ -Recurse }
           Compress-Archive -Path evidence/* -DestinationPath ci-evidence.zip -Force
 
       - name: Add test report to the release zip
@@ -72,6 +98,6 @@ jobs:
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
-          foreach ($t in 'v3.0.0-m1', "v$env:WMT_VERSION") { gh release delete $t --yes --cleanup-tag 2>$null; $global:LASTEXITCODE = 0 }
+          foreach ($t in 'v3.0.0-m1', 'v4.0.0-beta', "v$env:WMT_VERSION") { gh release delete $t --yes --cleanup-tag 2>$null; $global:LASTEXITCODE = 0 }
           gh release create "v$env:WMT_VERSION" "release/WMT-$env:WMT_VERSION.zip" ci-evidence.zip --target "${{ github.sha }}" --title "Workstation Migration Toolkit $env:WMT_VERSION" --notes-file docs/RELEASE-NOTES.md
           if ($LASTEXITCODE -ne 0) { throw 'release failed' }

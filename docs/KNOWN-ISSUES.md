@@ -1,4 +1,4 @@
-# Known issues and limitations — 4.0.0-beta
+# Known issues and limitations — 4.1.0-beta
 
 Tested automatically on GitHub Actions (Windows Server). See TEST-REPORT.md for the exact list of executed tests.
 

@@ -47,8 +47,11 @@ public class KeyboardLayoutTests
         return new Env(reg, sys32, wow, search, cache, sw);
     }
 
+    internal const string FakeKlc = "KBD\tkbdhycust\t\"Armenian Custom\"\r\n\r\nENDKBD\r\n";
+
     static KeyboardSnapshot Discover(Env e) =>
         new KeyboardLayoutDiscovery(e.Reg, p => File.Exists(p) ? (Path.GetFileName(p).StartsWith("kbdhy") ? "Tigran" : "Microsoft Corporation", "1.0") : null, e.Sys32, e.SysWow)
+        { KlcGenerator = l => l.Dll64 != null ? FakeKlc : null }
             .Discover(e.Software, new[] { e.Search }, CancellationToken.None);
 
     [Fact] public void Custom_layout_detected_with_every_reinstall_source()
@@ -66,12 +69,35 @@ public class KeyboardLayoutTests
         Assert.Equal(new[] { "en-US", "hy-AM" }, s.Input!.Languages.Select(l => l.Tag));
     }
 
-    [Fact] public void Dll_only_layout_is_reported_as_a_blocker_with_msklc_instructions()
+    [Fact] public void Dll_only_layout_is_ready_and_gets_a_generated_klc()
     {
         var s = Discover(Make(withSources: false, withCache: false));
         var c = s.Layouts.Single(l => l.IsCustom);
+        Assert.Equal(ReadinessState.Ready, c.BackupState);
+        Assert.StartsWith("Layout DLL (WMT installs it directly) + generated .klc", c.BackupSource);
+        Assert.Equal(FakeKlc, c.GeneratedKlc);
+        Assert.Null(s.Layouts.Single(l => !l.IsCustom).GeneratedKlc);
+    }
+
+    [Fact] public void Layout_without_dll_installer_or_klc_is_a_blocker_with_msklc_instructions()
+    {
+        var e = Make(withSources: false, withCache: false);
+        File.Delete(Path.Combine(e.Sys32, "kbdhycust.dll"));
+        var s = Discover(e);
+        var c = s.Layouts.Single(l => l.IsCustom);
         Assert.Equal(ReadinessState.Blocked, c.BackupState);
+        Assert.Null(c.GeneratedKlc);
         Assert.Contains(s.Issues, i => i.RequiredAction!.Contains("Load Existing Keyboard"));
+    }
+
+    [Fact] public void Klc_generator_failure_is_reported_not_fatal()
+    {
+        var e = Make(withSources: false, withCache: false);
+        var s = new KeyboardLayoutDiscovery(e.Reg, p => File.Exists(p) ? ("Tigran", "1.0") : null, e.Sys32, e.SysWow) { KlcGenerator = _ => throw new InvalidDataException("bad tables") }
+            .Discover(e.Software, new[] { e.Search }, CancellationToken.None);
+        var c = s.Layouts.Single(l => l.IsCustom);
+        Assert.Equal("bad tables", c.GeneratedKlcError);
+        Assert.Contains(s.Issues, i => i.Message.Contains("bad tables"));
     }
 
     [Fact] public void Klc_name_and_language_script()
@@ -105,7 +131,12 @@ public class KeyboardLayoutTests
 
         var proc = new FakeProcess { Handler = (_, _) => FakeProcess.Ok("") };
         var kr = new KeyboardRestore(proc, new MemoryRegistry());
-        Assert.StartsWith("msiexec /i", kr.Describe(pkg, layout));
+        Assert.Contains("msiexec /i", kr.Describe(pkg, layout));
+        Assert.Equal(KeyboardInstallMethod.Msi, kr.Plan(pkg, layout).Method);
+        var klcFile = Path.Combine(pkg.Layout.Root, "Reports", "Keyboard", "kbdhycust.klc");
+        Assert.True(File.Exists(klcFile));
+        Assert.Equal(FakeKlc, File.ReadAllText(klcFile));
+        Assert.Equal(0xFE, File.ReadAllBytes(klcFile)[1]); // UTF-16 LE BOM like MSKLC
         Assert.Equal("installed", kr.InstallAsync(pkg, layout, CancellationToken.None).GetAwaiter().GetResult());
         Assert.Contains(proc.Calls, c => c.StartsWith("msiexec /i") && c.Contains("kbdhycust_amd64.msi"));
         var installed = new MemoryRegistry(); installed.AddKey("HKLM", KeyboardLayoutDiscovery.LayoutsKey + "\\" + Klid, RegView.Reg64);

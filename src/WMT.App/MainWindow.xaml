@@ -176,10 +176,13 @@
                         <Button Content="Discover keyboard layouts" Command="{Binding DiscoverKeyboardCommand}" FontWeight="SemiBold" />
                         <Button Content="Select custom layouts" Command="{Binding SelectKeyboardCommand}" CommandParameter="custom" />
                         <Button Content="Clear" Command="{Binding SelectKeyboardCommand}" CommandParameter="none" />
+                        <Button Content="Save .klc files" Command="{Binding SaveKlcCommand}" ToolTip="Writes an MSKLC source (.klc) of each selected custom layout to Documents\WMT Keyboard Layouts" />
+                        <Button Content="Open in MSKLC" Command="{Binding OpenInMsklcCommand}" ToolTip="Opens the .klc of the first selected layout in Microsoft Keyboard Layout Creator (or offers its download page)" />
                     </WrapPanel>
                     <StackPanel Grid.Row="1" Margin="0,0,0,4">
                         <TextBlock Text="{Binding KeyboardStatus}" TextWrapping="Wrap" />
                         <TextBlock Text="{Binding KeyboardInputText}" TextWrapping="Wrap" Foreground="#FF333399" />
+                        <TextBlock Text="{Binding MsklcStatus}" TextWrapping="Wrap" Foreground="#FF555555" />
                     </StackPanel>
                     <DataGrid Grid.Row="2" ItemsSource="{Binding KeyboardRows}">
                         <DataGrid.Columns>
@@ -194,6 +197,7 @@
                             <DataGridTextColumn Header="Custom" Width="90" IsReadOnly="True" Binding="{Binding CustomText, Mode=OneWay}" />
                             <DataGridTextColumn Header="In your list" Width="80" IsReadOnly="True" Binding="{Binding EnabledText, Mode=OneWay}" />
                             <DataGridTextColumn Header="Best backup source" Width="1.5*" IsReadOnly="True" Binding="{Binding SourceText, Mode=OneWay}" />
+                            <DataGridTextColumn Header=".klc generated" Width="90" IsReadOnly="True" Binding="{Binding KlcText, Mode=OneWay}" />
                             <DataGridTextColumn Header="Layout file" Width="90" IsReadOnly="True" Binding="{Binding Info.LayoutFile, Mode=OneWay}" />
                             <DataGridTextColumn Header="Why custom" Width="1.5*" IsReadOnly="True" Binding="{Binding Info.Evidence, Mode=OneWay}" />
                         </DataGrid.Columns>

@@ -92,10 +92,20 @@ try
             foreach (var i in rep.Items) Console.WriteLine($"  [{i.State}] {i.Area}: {i.Name} — {i.Reason}");
             return rep.MigrationReady ? 0 : 3;
         }
+        case "klc":
+        {
+            // klc <layout.dll> <out.klc> [KLID] — writes an MSKLC source of an installed layout DLL.
+            var dll = args[1]; var klid = args.Length > 3 ? args[3] : "00000409";
+            var r = KlcExporter.Export(dll, Path.GetFileNameWithoutExtension(dll), Path.GetFileNameWithoutExtension(dll), klid);
+            Msklc.WriteKlc(args[2], r.Klc);
+            Console.WriteLine($"{Path.GetFileName(dll)}: {r.KeyRows} keys, {r.DeadKeys} dead-key entries, {r.ShiftStates} shift states" + (r.Warnings.Count > 0 ? " — " + string.Join("; ", r.Warnings) : ""));
+            return r.KeyRows > 0 ? 0 : 3;
+        }
         default:
             Console.Error.WriteLine("Usage: wmt-cli software [--winget] | profiles | office |\n" +
                 "       plan|backup --profile current|<SID> [--software <regex>] [--custom <dir>]... [--userdata Documents,Desktop] [--dest <existing dir>] |\n" +
-                "       retry <package> | verify <package> | test-restore <package> <empty dir> | readiness <package>");
+                "       retry <package> | verify <package> | test-restore <package> <empty dir> | readiness <package> |\n" +
+                "       klc <layout.dll> <out.klc> [KLID]");
             return 64;
     }
 }

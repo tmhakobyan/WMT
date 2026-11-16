@@ -1,5 +1,12 @@
 # Changelog
 
+## 4.1.0-beta — keyboard layouts restore without manual MSKLC work
+- **.klc generation**: for every custom layout WMT reads the installed DLL's KBDTABLES (the same data MSKLC's "Load Existing Keyboard" reads) and writes an MSKLC source (.klc, UTF-16): shift states, characters, Caps Lock / SGCaps, dead keys (incl. chained), ligatures, key names. Saved inside every package (`Reports\Keyboard`) and on demand (**Save .klc files** → Documents\WMT Keyboard Layouts). **Open in MSKLC** opens it in Microsoft Keyboard Layout Creator, or offers Microsoft's download page.
+- **Install from the saved DLL**: on the new Windows, *Install selected layouts* copies the layout DLL to System32 (and SysWOW64) and registers the KLID exactly like an MSKLC setup package (one UAC prompt). Existing different files/registrations are never overwritten; Layout Id conflicts get a free id. Layout DLLs are now Recommended in the plan and a DLL in the package makes the layout "Ready".
+- **Rebuild from .klc**: when the package has only a .klc and MSKLC is installed, WMT runs MSKLC's compiler (kbdutool) to build the 64-bit and WOW64 DLLs, then installs them.
+- MSKLC detection (Program Files, uninstall entry); `wmt-cli klc <dll> <out.klc> [KLID]`.
+- CI: .klc export of every Windows keyboard DLL, and a round trip through MSKLC's compiler (generated .klc → kbdutool → DLL → same .klc); real install/uninstall of a test layout on the CI machine.
+
 ## 4.0.0-beta — new implementation from the consolidated requirements
 Built from scratch in C# / .NET 8 / WPF as one self-contained Windows x64 program (no installation, no PowerShell).
 

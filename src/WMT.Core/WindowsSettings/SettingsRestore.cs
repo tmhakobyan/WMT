@@ -12,6 +12,9 @@ public interface IElevatedRunner
 
 public sealed class ElevatedPowerShell : IElevatedRunner
 {
+    /// <summary>False runs the same wrapper without the UAC prompt (used by tests on an already elevated CI machine).</summary>
+    public bool RunAs { get; init; } = true;
+
     public async Task<ProcessResult> RunPowerShellElevatedAsync(string script, CancellationToken ct)
     {
         var sw = Stopwatch.StartNew();
@@ -24,6 +27,7 @@ public sealed class ElevatedPowerShell : IElevatedRunner
         try
         {
             var psi = new ProcessStartInfo("powershell.exe", $"-NoProfile -ExecutionPolicy Bypass -File \"{ps1}\"") { UseShellExecute = true, Verb = "runas", WindowStyle = ProcessWindowStyle.Hidden };
+            if (!RunAs) { psi.UseShellExecute = false; psi.Verb = ""; psi.CreateNoWindow = true; }
             Process? p;
             try { p = Process.Start(psi); }
             catch (System.ComponentModel.Win32Exception ex) when (ex.NativeErrorCode == 1223)
@@ -350,39 +354,181 @@ public sealed class SettingsRestoreEngine
 }
 
 /// <summary>Installs keyboard layouts from the package (MSI found during backup). msiexec asks for administrator rights itself.</summary>
+public enum KeyboardInstallMethod { AlreadyInstalled, Msi, Dll, BuildFromKlc, None }
+
+public sealed record KeyboardInstallPlan(KeyboardInstallMethod Method, string Description);
+
+/// <summary>Reinstalls custom keyboard layouts on the new Windows: with the MSI when the package has one, otherwise directly from the
+/// saved layout DLL (copy to System32/SysWOW64 + register the KLID — what an MSKLC setup package does), otherwise by rebuilding the DLL
+/// from a .klc with MSKLC's compiler (kbdutool) when MSKLC is installed.</summary>
 public sealed class KeyboardRestore
 {
-    readonly IProcessRunner proc; readonly IRegistryReader reader;
-    public KeyboardRestore(IProcessRunner proc, IRegistryReader reader) { this.proc = proc; this.reader = reader; }
+    readonly IProcessRunner proc; readonly IRegistryReader reader; readonly IElevatedRunner elevated;
+    public MsklcInstall? Msklc { get; set; }
+    public string System32 { get; init; } = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.Windows), "System32");
+    public string SysWow64 { get; init; } = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.Windows), "SysWOW64");
+    public bool Is64BitOs { get; init; } = Environment.Is64BitOperatingSystem;
+
+    public KeyboardRestore(IProcessRunner proc, IRegistryReader reader, IElevatedRunner? elevated = null, MsklcInstall? msklc = null)
+    { this.proc = proc; this.reader = reader; this.elevated = elevated ?? new ElevatedPowerShell(); Msklc = msklc; }
+
+    public static string GeneratedKlcFileName(KeyboardLayoutInfo l) => l.KlcBaseName + ".klc";
+    public static string GeneratedKlcPackagePath(KeyboardLayoutInfo l) => Path.Combine("Reports", "Keyboard", GeneratedKlcFileName(l));
 
     public bool IsInstalled(KeyboardLayoutInfo l) => reader.KeyExists("HKLM", KeyboardLayoutDiscovery.LayoutsKey + "\\" + l.Klid, RegView.Reg64);
+
+    static string? Copied(LoadedPackage pkg, string? source) =>
+        source == null ? null : pkg.Files.FirstOrDefault(x => x.CopyStatus == FileCopyStatus.Copied && PathUtil.SamePath(x.SourcePath, source))?.PackagePath;
 
     /// <summary>Package-relative path of the best installer for this layout, or null.</summary>
     public static string? InstallerInPackage(LoadedPackage pkg, KeyboardLayoutInfo l)
     {
         foreach (var src in l.SetupPackages.Concat(l.CachedMsi != null ? new[] { l.CachedMsi } : Array.Empty<string>()))
-        {
-            var f = pkg.Files.FirstOrDefault(x => x.CopyStatus == FileCopyStatus.Copied && PathUtil.SamePath(x.SourcePath, src));
-            if (f?.PackagePath != null) return f.PackagePath;
-        }
+            if (Copied(pkg, src) is string p) return p;
         return null;
     }
 
-    public string Describe(LoadedPackage pkg, KeyboardLayoutInfo l) =>
-        IsInstalled(l) ? "Already installed on this computer" :
-        InstallerInPackage(pkg, l) is string p ? "msiexec /i " + p :
-        l.KlcSources.Count > 0 ? "Manual: open the .klc in Microsoft Keyboard Layout Creator → Project → Build DLL and Setup Package → run setup.exe" :
-        "No installer in the package: rebuild the layout with MSKLC";
+    /// <summary>Package-relative paths of the saved 64-bit (System32) and 32-bit (SysWOW64) layout DLLs.</summary>
+    public static (string? Dll64, string? Dll32) DllsInPackage(LoadedPackage pkg, KeyboardLayoutInfo l) => (Copied(pkg, l.Dll64), Copied(pkg, l.Dll32));
+
+    /// <summary>Absolute path of a .klc usable for rebuilding: the user's own .klc from the package, else the one WMT generated.</summary>
+    public static string? KlcInPackage(LoadedPackage pkg, KeyboardLayoutInfo l)
+    {
+        foreach (var k in l.KlcSources)
+            if (Copied(pkg, k) is string rel) return PathUtil.SafeCombine(pkg.Layout.Root, rel);
+        var gen = Path.Combine(pkg.Layout.Root, GeneratedKlcPackagePath(l));
+        return File.Exists(gen) ? gen : null;
+    }
+
+    public KeyboardInstallPlan Plan(LoadedPackage pkg, KeyboardLayoutInfo l)
+    {
+        if (IsInstalled(l)) return new(KeyboardInstallMethod.AlreadyInstalled, "Already installed on this computer");
+        if (InstallerInPackage(pkg, l) is string msi) return new(KeyboardInstallMethod.Msi, "Run its installer: msiexec /i " + msi);
+        if (DllsInPackage(pkg, l).Dll64 is string dll)
+            return new(KeyboardInstallMethod.Dll, $"Copy {l.LayoutFile} to System32{(DllsInPackage(pkg, l).Dll32 != null ? " and SysWOW64" : "")} and register {l.Klid} (from {dll}; MSKLC not needed)");
+        var klc = KlcInPackage(pkg, l);
+        if (klc != null && Msklc?.CanBuild == true) return new(KeyboardInstallMethod.BuildFromKlc, $"Build the DLL with MSKLC (kbdutool) from {Path.GetFileName(klc)}, then copy and register it");
+        if (klc != null) return new(KeyboardInstallMethod.None, $"Install Microsoft Keyboard Layout Creator ({Msklc_DownloadHint}) to rebuild from {Path.GetFileName(klc)}, or open it with 'Open in MSKLC'");
+        return new(KeyboardInstallMethod.None, "Nothing to install from in the package: the layout must be recreated");
+    }
+
+    const string Msklc_DownloadHint = "free, from Microsoft";
+
+    public string Describe(LoadedPackage pkg, KeyboardLayoutInfo l) => Plan(pkg, l).Description;
 
     public async Task<string> InstallAsync(LoadedPackage pkg, KeyboardLayoutInfo l, CancellationToken ct)
     {
+        var plan = Plan(pkg, l);
+        switch (plan.Method)
+        {
+            case KeyboardInstallMethod.AlreadyInstalled: return "already installed";
+            case KeyboardInstallMethod.Msi:
+            {
+                var msi = PathUtil.SafeCombine(pkg.Layout.Root, InstallerInPackage(pkg, l)!);
+                var logFile = Path.Combine(pkg.Layout.Status, $"msiexec-{l.Klid}-{DateTime.UtcNow:yyyyMMdd'T'HHmmss'Z'}.log");
+                Directory.CreateDirectory(pkg.Layout.Status);
+                var r = await proc.RunAsync("msiexec", new[] { "/i", msi, "/qb", "/norestart", "/l*v", logFile }, TimeSpan.FromMinutes(10), ct);
+                if (r.ExitCode is not (0 or 3010)) throw new InvalidOperationException($"msiexec failed: {r.Describe()} (log {logFile})");
+                return r.ExitCode == 3010 ? "installed — restart required" : "installed";
+            }
+            case KeyboardInstallMethod.Dll:
+            {
+                var (d64, d32) = DllsInPackage(pkg, l);
+                return await InstallDllAsync(PathUtil.SafeCombine(pkg.Layout.Root, d64!), d32 == null ? null : PathUtil.SafeCombine(pkg.Layout.Root, d32), l, ct);
+            }
+            case KeyboardInstallMethod.BuildFromKlc:
+            {
+                var outDir = Path.Combine(Path.GetTempPath(), "wmt-kbd-build-" + Guid.NewGuid().ToString("N"));
+                try
+                {
+                    var b = await WMT.Core.Msklc.BuildAsync(proc, Msklc!, KlcInPackage(pkg, l)!, outDir, ct);
+                    Directory.CreateDirectory(pkg.Layout.Status);
+                    File.WriteAllText(Path.Combine(pkg.Layout.Status, $"kbdutool-{l.Klid}-{DateTime.UtcNow:yyyyMMdd'T'HHmmss'Z'}.log"), b.Output);
+                    if (b.Dll64 == null) throw new InvalidOperationException("MSKLC could not build the layout DLL:\n" + b.Output.Trim());
+                    return "built with MSKLC; " + await InstallDllAsync(b.Dll64, b.DllWow64, l, ct);
+                }
+                finally { try { Directory.Delete(outDir, true); } catch { } }
+            }
+            default: throw new InvalidOperationException(plan.Description);
+        }
+    }
+
+    /// <summary>Layout Id values must be unique among installed layouts; keeps the old one when it is free.</summary>
+    public string ChooseLayoutId(string? wanted)
+    {
+        var used = new HashSet<int>();
+        foreach (var k in reader.SubKeys("HKLM", KeyboardLayoutDiscovery.LayoutsKey, RegView.Reg64))
+        {
+            var v = reader.Value("HKLM", KeyboardLayoutDiscovery.LayoutsKey + "\\" + k, "Layout Id", RegView.Reg64)?.AsString();
+            if (v != null && int.TryParse(v, System.Globalization.NumberStyles.HexNumber, null, out var n)) used.Add(n);
+        }
+        if (wanted != null && int.TryParse(wanted, System.Globalization.NumberStyles.HexNumber, null, out var w) && !used.Contains(w)) return wanted.ToLowerInvariant();
+        int next = (used.Count == 0 ? 0 : used.Max()) + 1;
+        while (used.Contains(next)) next++;
+        return next.ToString("x4");
+    }
+
+    static bool SameFile(string a, string b) => new FileInfo(a).Length == new FileInfo(b).Length && Hashing.Sha256File(a) == Hashing.Sha256File(b);
+
+    /// <summary>Installs a layout from its DLL(s). Never overwrites a different existing file or registration.</summary>
+    public async Task<string> InstallDllAsync(string dll64, string? dll32, KeyboardLayoutInfo l, CancellationToken ct)
+    {
         if (IsInstalled(l)) return "already installed";
-        var rel = InstallerInPackage(pkg, l) ?? throw new InvalidOperationException("No installer for this layout in the package.");
-        var msi = PathUtil.SafeCombine(pkg.Layout.Root, rel);
-        var logFile = Path.Combine(pkg.Layout.Status, $"msiexec-{l.Klid}-{DateTime.UtcNow:yyyyMMdd'T'HHmmss'Z'}.log");
-        Directory.CreateDirectory(pkg.Layout.Status);
-        var r = await proc.RunAsync("msiexec", new[] { "/i", msi, "/qb", "/norestart", "/l*v", logFile }, TimeSpan.FromMinutes(10), ct);
-        if (r.ExitCode is not (0 or 3010)) throw new InvalidOperationException($"msiexec failed: {r.Describe()} (log {logFile})");
-        return r.ExitCode == 3010 ? "installed — restart required" : "installed";
+        var file = l.LayoutFile;
+        if (string.IsNullOrWhiteSpace(file) || file.IndexOfAny(new[] { '\\', '/', ':' }) >= 0 || !file.EndsWith(".dll", StringComparison.OrdinalIgnoreCase))
+            throw new InvalidOperationException($"Unexpected layout file name '{file}'.");
+        if (!System.Text.RegularExpressions.Regex.IsMatch(l.Klid, "^[0-9A-Fa-f]{8}$")) throw new InvalidOperationException($"Unexpected KLID '{l.Klid}'.");
+        if (!File.Exists(dll64)) throw new FileNotFoundException("Layout DLL not found in the package", dll64);
+        var t64 = Path.Combine(System32, file);
+        bool copy64 = true, copy32 = dll32 != null && File.Exists(dll32) && Is64BitOs;
+        if (File.Exists(t64))
+        {
+            if (!SameFile(t64, dll64)) throw new InvalidOperationException($"A different file named {file} already exists in System32 (another layout uses this name). Nothing was changed.");
+            copy64 = false;
+        }
+        var t32 = Path.Combine(SysWow64, file);
+        if (copy32 && File.Exists(t32))
+        {
+            if (!SameFile(t32, dll32!)) throw new InvalidOperationException($"A different file named {file} already exists in SysWOW64. Nothing was changed.");
+            copy32 = false;
+        }
+        var layoutId = ChooseLayoutId(l.LayoutId);
+        // Stage in the user's temp folder: the elevated session may not see the user's mapped drives.
+        var stage = Path.Combine(Path.GetTempPath(), "wmt-kbd-" + Guid.NewGuid().ToString("N"));
+        Directory.CreateDirectory(stage);
+        try
+        {
+            string? s64 = null, s32 = null;
+            if (copy64) { s64 = Path.Combine(stage, "x64-" + file); File.Copy(dll64, s64); }
+            if (copy32) { s32 = Path.Combine(stage, "x86-" + file); File.Copy(dll32!, s32); }
+            var r = await elevated.RunPowerShellElevatedAsync(DllInstallScript(l, s64, s32, layoutId), ct);
+            if (r.StartFailed) throw new InvalidOperationException(r.StartError ?? "Could not start PowerShell as administrator.");
+            if (r.ExitCode != 0) throw new InvalidOperationException("Installing the layout failed: " + (r.StdOut + r.StdErr).Trim());
+        }
+        finally { try { Directory.Delete(stage, true); } catch { } }
+        if (!IsInstalled(l)) throw new InvalidOperationException("The layout was copied but its registration is not visible yet.");
+        return "installed from its DLL" + (layoutId != (l.LayoutId ?? "").ToLowerInvariant() ? $" (Layout Id {layoutId})" : "") + " — sign out and in (or restart) if it does not appear in Win+Space";
+    }
+
+    static string Q(string s) => "'" + s.Replace("'", "''") + "'";
+
+    /// <summary>PowerShell run as administrator: copies the DLL(s) and registers the KLID exactly as an MSKLC setup package does.</summary>
+    public static string DllInstallScript(KeyboardLayoutInfo l, string? staged64, string? staged32, string layoutId)
+    {
+        var sb = new StringBuilder();
+        sb.AppendLine("$ErrorActionPreference = 'Stop'");
+        sb.AppendLine("$sys = if ([Environment]::Is64BitOperatingSystem -and -not [Environment]::Is64BitProcess) { Join-Path $env:WINDIR 'Sysnative' } else { Join-Path $env:WINDIR 'System32' }");
+        if (staged64 != null) sb.AppendLine($"Copy-Item -LiteralPath {Q(staged64)} -Destination (Join-Path $sys {Q(l.LayoutFile)})");
+        if (staged32 != null) sb.AppendLine($"Copy-Item -LiteralPath {Q(staged32)} -Destination (Join-Path (Join-Path $env:WINDIR 'SysWOW64') {Q(l.LayoutFile)})");
+        sb.AppendLine($"$k = {Q(@"HKLM:\" + KeyboardLayoutDiscovery.LayoutsKey + "\\" + l.Klid.ToLowerInvariant())}");
+        sb.AppendLine("New-Item -Path $k -Force | Out-Null");
+        void Prop(string name, string value) => sb.AppendLine($"New-ItemProperty -Path $k -Name {Q(name)} -Value {Q(value)} -PropertyType String -Force | Out-Null");
+        Prop("Layout File", l.LayoutFile);
+        Prop("Layout Text", string.IsNullOrWhiteSpace(l.LayoutText) ? l.KlcBaseName : l.LayoutText);
+        Prop("Layout Id", layoutId);
+        if (l.DisplayName != null && l.DisplayName.Contains(l.LayoutFile, StringComparison.OrdinalIgnoreCase)) Prop("Layout Display Name", l.DisplayName);
+        if (!string.IsNullOrWhiteSpace(l.ComponentId)) Prop("Layout Component ID", l.ComponentId!);
+        sb.AppendLine($"Write-Output ('Registered ' + {Q(l.Klid)} + ' -> ' + {Q(l.LayoutFile)})");
+        return sb.ToString();
     }
 }

@@ -135,6 +135,9 @@ public sealed class SelfTest
         w.Tabs.SelectedIndex = 2;
         stall = await MeasureStall(() => vm.DiscoverKeyboardAsync());
         Check("KBD keyboard layouts discovered", vm.Keyboard != null && vm.KeyboardRows.Count >= 1, $"{vm.KeyboardRows.Count} layouts ({vm.KeyboardRows.Count(r => r.Info.IsCustom)} custom); UI max stall {stall:0} ms");
+        Check("KBD MSKLC status shown", vm.MsklcStatus.Contains("Keyboard Layout Creator"), vm.MsklcStatus);
+        Check("KBD .klc generated for every custom layout with a DLL", vm.KeyboardRows.Where(r => r.Info.IsCustom && r.Info.Dll64 != null).All(r => r.Info.GeneratedKlc != null),
+            string.Join("; ", vm.KeyboardRows.Where(r => r.Info.IsCustom).Select(r => $"{r.Info.Klid}: {r.KlcText}")));
         await Shot("03b-keyboard-layouts");
         w.Tabs.SelectedIndex = 3;
         stall = await MeasureStall(() => vm.DiscoverSettingsAsync());
