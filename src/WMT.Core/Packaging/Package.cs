@@ -91,6 +91,8 @@ public sealed class LoadedPackage
     public List<string> FunctionalTests { get; init; } = new();
     public OfficeEnvironment? Office { get; init; }
     public PythonInventory? Python { get; init; }
+    public WindowsSettingsSnapshot? WindowsSettings { get; init; }
+    public KeyboardSnapshot? Keyboard { get; init; }
 
     public static LoadedPackage Load(string root)
     {
@@ -113,7 +115,14 @@ public sealed class LoadedPackage
             FunctionalTests = plan?.FunctionalTests ?? new(),
             Office = Opt<OfficeEnvironment>("Office-Environment.json"),
             Python = Opt<PythonInventory>("Python-Environments.json"),
+            WindowsSettings = TryOpt<WindowsSettingsSnapshot>(l.M("Windows-Settings.json")),
+            Keyboard = TryOpt<KeyboardSnapshot>(l.M("Keyboard-Layouts.json")),
         };
+    }
+
+    static T? TryOpt<T>(string path) where T : class
+    {
+        try { return File.Exists(path) ? Json.ReadFile<T>(path) : null; } catch { return null; }
     }
 
     /// <summary>Fingerprint of the package metadata: changes whenever Metadata-Hashes.json changes.</summary>

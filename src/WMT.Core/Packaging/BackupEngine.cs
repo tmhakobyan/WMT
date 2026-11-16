@@ -160,7 +160,8 @@ public sealed class BackupEngine
         Json.WriteFile(l.M("Dependencies.json"), plan.Dependencies);
         Json.WriteFile(l.M("Office-Environment.json"), plan.Office ?? OfficeEnvironment.Absent());
         Json.WriteFile(l.M("Python-Environments.json"), plan.Python ?? new PythonInventory());
-        Json.WriteFile(l.M("Windows-Settings.json"), plan.WindowsSettings ?? new List<object>());
+        Json.WriteFile(l.M("Windows-Settings.json"), plan.WindowsSettings ?? new WindowsSettingsSnapshot());
+        Json.WriteFile(l.M("Keyboard-Layouts.json"), plan.Keyboard ?? new KeyboardSnapshot());
         Json.WriteFile(l.M("VBA-Analysis.json"), plan.VbaAnalyses);
         Json.WriteFile(Path.Combine(l.Manifests, "Registry-REVIEW-ONLY", "Registry.json"), plan.Registry);
         if (input.WingetExportJson != null) Json.WriteText(l.M("Winget-Export.json"), input.WingetExportJson);

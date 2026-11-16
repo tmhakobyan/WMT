@@ -65,6 +65,8 @@ public sealed class JournalEntry
     public string? RegOldType { get; set; }
     public string? RegOldData { get; set; }
     public List<string>? RegOldMulti { get; set; }
+    /// <summary>For actions done by a command: how to undo them manually.</summary>
+    public string? UndoHint { get; set; }
     public DateTime Utc { get; set; } = DateTime.UtcNow;
 }
 
@@ -247,6 +249,7 @@ public sealed class RestoreEngine
                     }
                     if (e.BackupOfPrevious != null && File.Exists(e.BackupOfPrevious)) File.Copy(e.BackupOfPrevious, e.Target, overwrite: false);
                 }
+                else if (e.Kind == "Command") { problems.Add($"Not undone automatically: {e.Target}. To undo: {e.UndoHint}"); continue; }
                 else if (e.Kind == "Registry")
                 {
                     if (!e.RegExisted) regWriter.DeleteValue("HKCU", e.RegKey!, e.RegName!);

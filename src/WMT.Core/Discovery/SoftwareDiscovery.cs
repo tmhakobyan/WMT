@@ -193,6 +193,7 @@ public sealed class SoftwareDiscovery
                 InstallationType = r.PerUser ? "Per-user" : r.WindowsInstaller ? "MSI" : "Installer (EXE)",
                 InstallLocation = string.IsNullOrWhiteSpace(r.InstallLocation) ? SoftwareItem.UnknownText : r.InstallLocation.Trim().Trim('"'),
                 DetectedSource = r.Source,
+                UninstallKey = r.KeyName,
                 Category = cat,
                 RecoveryMethod = RecoveryFor(cat),
                 Confidence = version != SoftwareItem.UnknownText ? Confidence.Confirmed : Confidence.Inferred,

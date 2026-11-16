@@ -91,6 +91,16 @@ public sealed class Indexer
             }
             root.Path = canon;
             index.RootsByPath[canon + "|" + root.Category] = root;
+            if (root.OnlyFiles != null)
+            {
+                foreach (var name in root.OnlyFiles.Distinct(StringComparer.OrdinalIgnoreCase))
+                {
+                    var fi = new FileInfo(Path.Combine(canon, name));
+                    if (fi.Exists) AddFile(root, fi);
+                    else index.Issues.Add(new Issue(IssueSeverity.Warning, "Scan", "Expected file not found.", fi.FullName));
+                }
+                continue;
+            }
             var visited = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
             Walk(root, canon, 0, visited);
         }
@@ -156,20 +166,31 @@ public sealed class Indexer
             }
             else if (e is FileInfo f)
             {
+                if (AddFile(root, f)) eligible++;
+                if (++scanned % 500 == 0) progress?.Report(new ProgressInfo("Indexing " + root.Category, scanned, null, dir));
+            }
+        }
+        if (eligible == 0 && depth > 0) Record(root, dir, FolderState.OnlyExcluded, hadSkippedChildren ? "Contains only excluded or not-entered items" : "Contains only excluded items");
+        return eligible;
+    }
+
+    /// <summary>Applies the root's rule to one file; returns true when the file was added to the index.</summary>
+    bool AddFile(ScanRoot root, FileInfo f)
+    {
                 if (f.Attributes.HasFlag(FileAttributes.ReparsePoint) && !f.Attributes.HasFlag((FileAttributes)0x400000))
-                { index.ReparsePointsSkipped++; continue; }
+                { index.ReparsePointsSkipped++; return false; }
                 var rel = Path.GetRelativePath(root.Path, f.FullName);
                 FileCandidate cand;
                 try { cand = new FileCandidate(f.FullName, f.Name, f.Extension, f.Length, f.LastWriteTimeUtc, f.Attributes, rel); }
                 catch (Exception ex) when (ex is IOException or UnauthorizedAccessException)
                 {
                     index.Issues.Add(new Issue(IssueSeverity.Warning, "Scan", "File metadata not readable: " + ex.Message, f.FullName));
-                    continue;
+                    return false;
                 }
                 FileDecision? dec;
                 try { dec = root.Rule(cand); } catch { dec = new FileDecision(Classification.Review, "Rule error: review manually"); }
-                if (dec == null) { index.ExcludedFiles++; continue; }
-                if (!claimed.Add(f.FullName)) { index.DuplicateFilesSkipped++; continue; }
+                if (dec == null) { index.ExcludedFiles++; return false; }
+                if (!claimed.Add(f.FullName)) { index.DuplicateFilesSkipped++; return false; }
                 index.Files.Add(new FileEntry
                 {
                     Id = "F" + PathUtil.StableId(f.FullName),
@@ -179,12 +200,7 @@ public sealed class Indexer
                     DestinationRule = root.ProfileSid != null ? "Mapped target profile + path relative to the source profile" : "Same path (drive can be remapped at restore)",
                     State = LifecycleState.Planned
                 });
-                eligible++;
-                if (++scanned % 500 == 0) progress?.Report(new ProgressInfo("Indexing " + root.Category, scanned, null, dir));
-            }
-        }
-        if (eligible == 0 && depth > 0) Record(root, dir, FolderState.OnlyExcluded, hadSkippedChildren ? "Contains only excluded or not-entered items" : "Contains only excluded items");
-        return eligible;
+                return true;
     }
 
     static bool LooksLikePackage(string dir)

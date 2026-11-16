@@ -95,6 +95,9 @@ public sealed partial class MainViewModel
         var cats = SelectedUserDataCategories();
         foreach (var p in Profiles.Where(p => p.IsSelected)) opts.UserData[p.Item.Sid] = new HashSet<string>(cats, StringComparer.OrdinalIgnoreCase);
         if (!string.IsNullOrWhiteSpace(Destination)) opts.ExcludedPaths.Add(Destination);
+        opts.Keyboard = keyboard;
+        opts.WindowsSettings = settings;
+        if (settings == null) opts.IncludeWindowsSettings = false;
         return opts;
     }
 

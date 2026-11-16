@@ -133,6 +133,16 @@ public sealed class SelfTest
         await Shot("03-profiles");
 
         w.Tabs.SelectedIndex = 2;
+        stall = await MeasureStall(() => vm.DiscoverKeyboardAsync());
+        Check("KBD keyboard layouts discovered", vm.Keyboard != null && vm.KeyboardRows.Count >= 1, $"{vm.KeyboardRows.Count} layouts ({vm.KeyboardRows.Count(r => r.Info.IsCustom)} custom); UI max stall {stall:0} ms");
+        await Shot("03b-keyboard-layouts");
+        w.Tabs.SelectedIndex = 3;
+        stall = await MeasureStall(() => vm.DiscoverSettingsAsync());
+        Check("WIN Windows settings discovered", vm.Settings != null && vm.SettingsCount > 3, $"{vm.SettingsCount} settings; groups: {string.Join(", ", vm.Settings?.Items.GroupBy(i => i.Group).Select(g => g.Key + " " + g.Count()) ?? Array.Empty<string>())}; UI max stall {stall:0} ms");
+        Check("WIN no Wi-Fi password exported", vm.Settings?.Items.Where(i => i.Kind == SettingKinds.WiFi).All(i => !(i.Payload ?? "").Contains("keyMaterial")) != false);
+        await Shot("03c-windows-settings");
+
+        w.Tabs.SelectedIndex = 4;
         stall = await MeasureStall(() => vm.GeneratePlanAsync());
         var plan = vm.Plan;
         int fixtureFiles = plan?.Index.Files.Count(f => f.SourcePath.StartsWith(fixture, StringComparison.OrdinalIgnoreCase)) ?? 0;
@@ -175,7 +185,7 @@ public sealed class SelfTest
             else Check("fixture Images folder in tree", false);
         }
 
-        w.Tabs.SelectedIndex = 3; w.RecoveryTabs.SelectedIndex = 0;
+        w.Tabs.SelectedIndex = 5; w.RecoveryTabs.SelectedIndex = 0;
         vm.Destination = dest;
         vm.BuildPreview();
         await Shot("07-backup-preview");
@@ -209,7 +219,14 @@ public sealed class SelfTest
         Check("Help loads (Armenian)", help.HelpText.Text.Contains("Օգնություն") || help.HelpText.Text.Contains("ՕԳՆՈՒԹՅՈՒՆ"));
         help.Close();
 
+        w.Tabs.SelectedIndex = 3;
+        vm.SettingsDryRunCommand.Execute(null);
+        Check("WIN settings dry run from package", vm.SettingActionRows.Count > 0, vm.SettingsRestoreStatus);
+        await Shot("11b-settings-dryrun");
         w.Tabs.SelectedIndex = 2;
+        await Shot("11c-keyboard-restore-section");
+
+        w.Tabs.SelectedIndex = 4;
         w.Width = 900; w.Height = 600;
         await Settle(800);
         await Shot("12-small-window");

@@ -90,6 +90,20 @@ public static class ReadinessEvaluator
             });
         }
 
+        foreach (var l in pkg.Keyboard?.Layouts.Where(l => l.Selected && l.IsCustom) ?? Enumerable.Empty<KeyboardLayoutInfo>())
+        {
+            bool installer = KeyboardRestore.InstallerInPackage(pkg, l) != null;
+            bool klc = l.KlcSources.Any(k => pkg.Files.Any(f => f.CopyStatus == FileCopyStatus.Copied && PathUtil.SamePath(f.SourcePath, k)));
+            var st = installer ? ReadinessState.Ready : klc ? ReadinessState.NeedsReview : ReadinessState.Blocked;
+            Add(new ReadinessItem
+            {
+                Key = "keyboard." + l.Klid, Area = "Keyboard layouts", Name = $"{l.LayoutText} ({l.Klid})", State = st,
+                Confirmable = st != ReadinessState.Ready, ConfirmLabel = "I rebuilt this layout with MSKLC and backed up the new setup package / I accept losing it",
+                Reason = installer ? "Installer is in the package" : klc ? "Only the .klc source is in the package: must be rebuilt with MSKLC on the new system" : "No installer and no .klc source in the package",
+                Action = installer ? "" : "MSKLC → File → Load Existing Keyboard → Save .klc → Build DLL and Setup Package; then back up again"
+            });
+        }
+
         foreach (var env in pkg.Python?.Environments ?? new())
         {
             var st = env.Overall switch { CaptureStatus.Captured => ReadinessState.Ready, CaptureStatus.Partial => ReadinessState.NeedsReview, _ => ReadinessState.Blocked };

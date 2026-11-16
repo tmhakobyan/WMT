@@ -150,7 +150,6 @@
                         </GroupBox>
                         <GroupBox Grid.Column="1" Header="Options" Margin="6,0,0,0">
                             <StackPanel Margin="4">
-                                <CheckBox Content="Windows settings (fonts, environment, PATH, default apps)" IsChecked="{Binding IncludeWindowsSettings}" Margin="0,0,0,4" />
                                 <CheckBox Content="Runtimes (reinstall list)" IsChecked="{Binding IncludeRuntimes}" Margin="0,0,0,4" />
                                 <StackPanel Orientation="Horizontal">
                                     <TextBlock Text="Empty folders:" VerticalAlignment="Center" Margin="0,0,6,0" />
@@ -159,6 +158,119 @@
                             </StackPanel>
                         </GroupBox>
                     </Grid>
+                </Grid>
+            </TabItem>
+
+            <!-- ============================ KEYBOARD LAYOUTS ============================ -->
+            <TabItem Header="Keyboard Layouts">
+                <Grid Margin="6" IsEnabled="{Binding IsIdle}">
+                    <Grid.RowDefinitions>
+                        <RowDefinition Height="Auto" />
+                        <RowDefinition Height="Auto" />
+                        <RowDefinition Height="*" MinHeight="100" />
+                        <RowDefinition Height="Auto" />
+                        <RowDefinition Height="Auto" />
+                        <RowDefinition Height="170" MinHeight="60" />
+                    </Grid.RowDefinitions>
+                    <WrapPanel Grid.Row="0">
+                        <Button Content="Discover keyboard layouts" Command="{Binding DiscoverKeyboardCommand}" FontWeight="SemiBold" />
+                        <Button Content="Select custom layouts" Command="{Binding SelectKeyboardCommand}" CommandParameter="custom" />
+                        <Button Content="Clear" Command="{Binding SelectKeyboardCommand}" CommandParameter="none" />
+                    </WrapPanel>
+                    <StackPanel Grid.Row="1" Margin="0,0,0,4">
+                        <TextBlock Text="{Binding KeyboardStatus}" TextWrapping="Wrap" />
+                        <TextBlock Text="{Binding KeyboardInputText}" TextWrapping="Wrap" Foreground="#FF333399" />
+                    </StackPanel>
+                    <DataGrid Grid.Row="2" ItemsSource="{Binding KeyboardRows}">
+                        <DataGrid.Columns>
+                            <DataGridTemplateColumn Header="Selected" Width="62">
+                                <DataGridTemplateColumn.CellTemplate>
+                                    <DataTemplate><CheckBox IsChecked="{Binding IsSelected, UpdateSourceTrigger=PropertyChanged}" HorizontalAlignment="Center" /></DataTemplate>
+                                </DataGridTemplateColumn.CellTemplate>
+                            </DataGridTemplateColumn>
+                            <DataGridTextColumn Header="Layout" Width="1.3*" IsReadOnly="True" Binding="{Binding Info.LayoutText, Mode=OneWay}" />
+                            <DataGridTextColumn Header="KLID" Width="80" IsReadOnly="True" Binding="{Binding Info.Klid, Mode=OneWay}" />
+                            <DataGridTextColumn Header="Language" Width="70" IsReadOnly="True" Binding="{Binding Info.Language, Mode=OneWay}" />
+                            <DataGridTextColumn Header="Custom" Width="90" IsReadOnly="True" Binding="{Binding CustomText, Mode=OneWay}" />
+                            <DataGridTextColumn Header="In your list" Width="80" IsReadOnly="True" Binding="{Binding EnabledText, Mode=OneWay}" />
+                            <DataGridTextColumn Header="Best backup source" Width="1.5*" IsReadOnly="True" Binding="{Binding SourceText, Mode=OneWay}" />
+                            <DataGridTextColumn Header="Layout file" Width="90" IsReadOnly="True" Binding="{Binding Info.LayoutFile, Mode=OneWay}" />
+                            <DataGridTextColumn Header="Why custom" Width="1.5*" IsReadOnly="True" Binding="{Binding Info.Evidence, Mode=OneWay}" />
+                        </DataGrid.Columns>
+                    </DataGrid>
+                    <GridSplitter Grid.Row="3" Style="{StaticResource HSplit}" />
+                    <WrapPanel Grid.Row="4" Margin="0,4,0,0">
+                        <TextBlock Text="Restore from package (on the new Windows; open the package in Backup &amp; Recovery first):" FontWeight="SemiBold" VerticalAlignment="Center" Margin="0,0,8,6" />
+                        <Button Content="Install selected layouts" Command="{Binding InstallLayoutsCommand}" />
+                        <Button Content="Restore language list and keyboard order" Command="{Binding RestoreLanguagesCommand}" />
+                    </WrapPanel>
+                    <DataGrid Grid.Row="5" ItemsSource="{Binding KeyboardRestoreRows}">
+                        <DataGrid.Columns>
+                            <DataGridCheckBoxColumn Header="Install" Width="55" Binding="{Binding Selected, UpdateSourceTrigger=PropertyChanged}" />
+                            <DataGridTextColumn Header="Layout" Width="*" IsReadOnly="True" Binding="{Binding Info.LayoutText, Mode=OneWay}" />
+                            <DataGridTextColumn Header="KLID" Width="80" IsReadOnly="True" Binding="{Binding Info.Klid, Mode=OneWay}" />
+                            <DataGridTextColumn Header="What will happen" Width="2*" IsReadOnly="True" Binding="{Binding Action, Mode=OneWay}" />
+                        </DataGrid.Columns>
+                    </DataGrid>
+                </Grid>
+            </TabItem>
+
+            <!-- ============================ WINDOWS SETTINGS ============================ -->
+            <TabItem Header="Windows Settings">
+                <Grid Margin="6" IsEnabled="{Binding IsIdle}">
+                    <Grid.RowDefinitions>
+                        <RowDefinition Height="Auto" />
+                        <RowDefinition Height="Auto" />
+                        <RowDefinition Height="*" MinHeight="100" />
+                        <RowDefinition Height="Auto" />
+                        <RowDefinition Height="Auto" />
+                        <RowDefinition Height="190" MinHeight="60" />
+                    </Grid.RowDefinitions>
+                    <WrapPanel Grid.Row="0">
+                        <Button Content="Discover Windows settings" Command="{Binding DiscoverSettingsCommand}" FontWeight="SemiBold" />
+                        <Button Content="Select Recommended settings" Command="{Binding SelectSettingsCommand}" CommandParameter="recommended" />
+                        <Button Content="Clear" Command="{Binding SelectSettingsCommand}" CommandParameter="none" />
+                        <TextBlock Text="Group:" VerticalAlignment="Center" Margin="6,0,4,6" />
+                        <ComboBox Width="190" Margin="0,0,0,6" ItemsSource="{Binding SettingGroupChoices}" SelectedItem="{Binding SettingsGroup}" />
+                    </WrapPanel>
+                    <TextBlock Grid.Row="1" Text="{Binding SettingsStatus}" TextWrapping="Wrap" Margin="0,0,0,4" />
+                    <DataGrid Grid.Row="2" ItemsSource="{Binding SettingsView}">
+                        <DataGrid.Columns>
+                            <DataGridTemplateColumn Header="Selected" Width="62">
+                                <DataGridTemplateColumn.CellTemplate>
+                                    <DataTemplate><CheckBox IsChecked="{Binding IsSelected, UpdateSourceTrigger=PropertyChanged}" HorizontalAlignment="Center" /></DataTemplate>
+                                </DataGridTemplateColumn.CellTemplate>
+                            </DataGridTemplateColumn>
+                            <DataGridTextColumn Header="Group" Width="120" IsReadOnly="True" Binding="{Binding Item.Group, Mode=OneWay}" />
+                            <DataGridTextColumn Header="Setting" Width="1.3*" IsReadOnly="True" Binding="{Binding Item.Name, Mode=OneWay}" />
+                            <DataGridTextColumn Header="Value" Width="1.6*" IsReadOnly="True" Binding="{Binding Item.Summary, Mode=OneWay}" />
+                            <DataGridTextColumn Header="How it is restored" Width="1.4*" IsReadOnly="True" Binding="{Binding Item.RestoreMethod, Mode=OneWay}" />
+                            <DataGridTextColumn Header="Administrator" Width="85" IsReadOnly="True" Binding="{Binding AdminText, Mode=OneWay}" />
+                            <DataGridTextColumn Header="Sign-out" Width="65" IsReadOnly="True" Binding="{Binding SignOutText, Mode=OneWay}" />
+                            <DataGridTextColumn Header="Class" Width="95" IsReadOnly="True" Binding="{Binding Item.Classification, Mode=OneWay}" />
+                            <DataGridTextColumn Header="Note" Width="*" IsReadOnly="True" Binding="{Binding Item.Note, Mode=OneWay}" />
+                        </DataGrid.Columns>
+                    </DataGrid>
+                    <GridSplitter Grid.Row="3" Style="{StaticResource HSplit}" />
+                    <StackPanel Grid.Row="4" Margin="0,4,0,0">
+                        <WrapPanel>
+                            <TextBlock Text="Restore from package (on the new Windows):" FontWeight="SemiBold" VerticalAlignment="Center" Margin="0,0,8,6" />
+                            <Button Content="Dry run settings" Command="{Binding SettingsDryRunCommand}" />
+                            <Button Content="Apply selected settings" Command="{Binding ApplySettingsCommand}" FontWeight="SemiBold" />
+                            <Button Content="Undo last settings restore" Command="{Binding UndoSettingsCommand}" />
+                        </WrapPanel>
+                        <TextBlock Text="{Binding SettingsRestoreStatus}" TextWrapping="Wrap" />
+                    </StackPanel>
+                    <DataGrid Grid.Row="5" ItemsSource="{Binding SettingActionRows}">
+                        <DataGrid.Columns>
+                            <DataGridCheckBoxColumn Header="Apply" Width="50" Binding="{Binding Selected, UpdateSourceTrigger=PropertyChanged}" />
+                            <DataGridTextColumn Header="Group" Width="120" IsReadOnly="True" Binding="{Binding Action.Group, Mode=OneWay}" />
+                            <DataGridTextColumn Header="Setting" Width="*" IsReadOnly="True" Binding="{Binding Action.Name, Mode=OneWay}" />
+                            <DataGridTextColumn Header="What will happen" Width="2*" IsReadOnly="True" Binding="{Binding Action.Description, Mode=OneWay}" />
+                            <DataGridTextColumn Header="Administrator" Width="85" IsReadOnly="True" Binding="{Binding AdminText, Mode=OneWay}" />
+                            <DataGridTextColumn Header="Sign-out" Width="65" IsReadOnly="True" Binding="{Binding SignOutText, Mode=OneWay}" />
+                        </DataGrid.Columns>
+                    </DataGrid>
                 </Grid>
             </TabItem>
 

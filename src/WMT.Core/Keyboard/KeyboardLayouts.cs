@@ -1,0 +1,326 @@
+using System.Diagnostics;
+using System.Globalization;
+using System.Text;
+using System.Text.RegularExpressions;
+
+namespace WMT.Core;
+
+public sealed class KeyboardLayoutInfo
+{
+    public string Klid { get; set; } = "";
+    public string LayoutFile { get; set; } = "";
+    public string LayoutText { get; set; } = "";
+    public string? DisplayName { get; set; }
+    public string? LayoutId { get; set; }
+    public string? ComponentId { get; set; }
+    public string Language { get; set; } = SoftwareItem.UnknownText;
+    public bool IsCustom { get; set; }
+    public string Evidence { get; set; } = "";
+    public string? Dll64 { get; set; }
+    public string? Dll32 { get; set; }
+    public string? DllCompany { get; set; }
+    public string? DllVersion { get; set; }
+    public string? ProductName { get; set; }
+    public string? ProductCode { get; set; }
+    public string? CachedMsi { get; set; }
+    public List<string> KlcSources { get; set; } = new();
+    public List<string> SetupPackages { get; set; } = new();
+    public bool EnabledForCurrentUser { get; set; }
+    public string InputTip { get; set; } = "";
+    public bool Selected { get; set; }
+
+    /// <summary>Best available way to reinstall this layout on the new system.</summary>
+    public string BackupSource =>
+        !IsCustom ? "Built into Windows (nothing to back up)" :
+        SetupPackages.Count > 0 ? "Original setup package" + (KlcSources.Count > 0 ? " + .klc source" : "") :
+        CachedMsi != null ? "Installer from Windows Installer cache" + (KlcSources.Count > 0 ? " + .klc source" : "") :
+        KlcSources.Count > 0 ? ".klc source (rebuild with MSKLC)" :
+        Dll64 != null ? "Layout DLL only (rebuild with MSKLC first!)" : "Nothing found";
+
+    public ReadinessState BackupState =>
+        !IsCustom ? ReadinessState.Ready :
+        SetupPackages.Count > 0 || CachedMsi != null ? ReadinessState.Ready :
+        KlcSources.Count > 0 ? ReadinessState.NeedsReview : ReadinessState.Blocked;
+}
+
+public sealed class UserLanguage
+{
+    public string Tag { get; set; } = "";
+    /// <summary>Input method tips in order, e.g. "042B:A000042B" (LANGID:KLID).</summary>
+    public List<string> InputTips { get; set; } = new();
+}
+
+public sealed class UserInputSettings
+{
+    public List<UserLanguage> Languages { get; set; } = new();
+    public List<string> Preload { get; set; } = new();
+    public Dictionary<string, string> Substitutes { get; set; } = new(StringComparer.OrdinalIgnoreCase);
+    public string? InputMethodOverride { get; set; }
+}
+
+public sealed class KeyboardSnapshot
+{
+    public DateTime CapturedUtc { get; set; } = DateTime.UtcNow;
+    public string Machine { get; set; } = Environment.MachineName;
+    public List<KeyboardLayoutInfo> Layouts { get; set; } = new();
+    public UserInputSettings? Input { get; set; }
+    public List<Issue> Issues { get; set; } = new();
+}
+
+/// <summary>Finds keyboard layouts (especially ones made with Microsoft Keyboard Layout Creator) and every way to reinstall them.</summary>
+public sealed class KeyboardLayoutDiscovery
+{
+    public const string LayoutsKey = @"SYSTEM\CurrentControlSet\Control\Keyboard Layouts";
+    const string InstallerUserData = @"SOFTWARE\Microsoft\Windows\CurrentVersion\Installer\UserData";
+    static readonly Regex TipRx = new(@"^[0-9A-Fa-f]{4}:[0-9A-Fa-f]{8}$", RegexOptions.Compiled);
+
+    readonly IRegistryReader reg;
+    readonly Func<string, (string? Company, string? Version)?> dllInfo;
+    readonly string system32, sysWow64;
+
+    public KeyboardLayoutDiscovery(IRegistryReader reg, Func<string, (string? Company, string? Version)?>? dllInfo = null, string? system32 = null, string? sysWow64 = null)
+    {
+        this.reg = reg;
+        this.dllInfo = dllInfo ?? DefaultDllInfo;
+        var win = Environment.GetFolderPath(Environment.SpecialFolder.Windows);
+        this.system32 = system32 ?? Path.Combine(win, "System32");
+        this.sysWow64 = sysWow64 ?? Path.Combine(win, "SysWOW64");
+    }
+
+    static (string? Company, string? Version)? DefaultDllInfo(string path)
+    {
+        if (!File.Exists(path)) return null;
+        try { var v = FileVersionInfo.GetVersionInfo(path); return (v.CompanyName, v.FileVersion); } catch { return (null, null); }
+    }
+
+    public static string LanguageOf(string klid)
+    {
+        try
+        {
+            var lcid = Convert.ToInt32(klid[^4..], 16);
+            return CultureInfo.GetCultureInfo(lcid).Name;
+        }
+        catch { return SoftwareItem.UnknownText; }
+    }
+
+    public KeyboardSnapshot Discover(IReadOnlyList<SoftwareItem> software, IEnumerable<string> searchFolders, CancellationToken ct)
+    {
+        var snap = new KeyboardSnapshot { Input = ReadUserInput() };
+        var enabledKlids = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+        foreach (var l in snap.Input.Languages) foreach (var t in l.InputTips) enabledKlids.Add(t.Split(':')[1]);
+        foreach (var p in snap.Input.Preload) enabledKlids.Add(snap.Input.Substitutes.TryGetValue(p, out var s) ? s : p);
+
+        foreach (var klid in reg.SubKeys("HKLM", LayoutsKey, RegView.Reg64))
+        {
+            ct.ThrowIfCancellationRequested();
+            var k = LayoutsKey + "\\" + klid;
+            string? V(string n) => reg.Value("HKLM", k, n, RegView.Reg64)?.AsString();
+            var file = V("Layout File");
+            if (string.IsNullOrWhiteSpace(file)) continue;
+            var info = new KeyboardLayoutInfo
+            {
+                Klid = klid.ToUpperInvariant(), LayoutFile = file, LayoutText = V("Layout Text") ?? klid, DisplayName = V("Layout Display Name"),
+                LayoutId = V("Layout Id"), ComponentId = V("Layout Component ID"), Language = LanguageOf(klid),
+            };
+            var d64 = Path.Combine(system32, file); var d32 = Path.Combine(sysWow64, file);
+            var di = dllInfo(d64);
+            if (di != null) { info.Dll64 = d64; info.DllCompany = di.Value.Company; info.DllVersion = di.Value.Version; }
+            if (dllInfo(d32) != null) info.Dll32 = d32;
+            var evidence = new List<string>();
+            if (klid.StartsWith("a", StringComparison.OrdinalIgnoreCase)) evidence.Add("KLID starts with 'A' (MSKLC numbering)");
+            if (di != null && !string.IsNullOrWhiteSpace(info.DllCompany) && !info.DllCompany!.Contains("Microsoft Corporation", StringComparison.OrdinalIgnoreCase))
+                evidence.Add($"layout DLL publisher is '{info.DllCompany}'");
+            if (di != null && string.IsNullOrWhiteSpace(info.DllCompany) && !file.StartsWith("kbd", StringComparison.OrdinalIgnoreCase))
+                evidence.Add("layout DLL has no publisher");
+            if (di == null) evidence.Add("layout DLL not found in System32");
+            info.IsCustom = evidence.Count > 0 && (di != null || klid.StartsWith("a", StringComparison.OrdinalIgnoreCase));
+            info.Evidence = info.IsCustom ? string.Join("; ", evidence) : "Microsoft layout shipped with Windows";
+            info.EnabledForCurrentUser = enabledKlids.Contains(info.Klid);
+            info.InputTip = $"{info.Klid[^4..]}:{info.Klid}";
+            if (!info.IsCustom && !info.EnabledForCurrentUser) continue;
+            if (info.IsCustom) FindInstaller(info, software);
+            snap.Layouts.Add(info);
+        }
+
+        var custom = snap.Layouts.Where(l => l.IsCustom).ToList();
+        if (custom.Count > 0) FindSources(custom, searchFolders, ct);
+        foreach (var l in custom.Where(l => l.BackupState == ReadinessState.Blocked))
+            snap.Issues.Add(new Issue(IssueSeverity.Warning, "Keyboard layouts", $"No installer or .klc source was found for '{l.LayoutText}' ({l.Klid}).", l.Dll64,
+                "Before wiping Windows 10: open Microsoft Keyboard Layout Creator → File → Load Existing Keyboard → choose this layout → Save As .klc; then Project → Build DLL and Setup Package, and run discovery again."));
+        snap.Layouts = snap.Layouts.OrderByDescending(l => l.IsCustom).ThenBy(l => l.LayoutText, StringComparer.CurrentCultureIgnoreCase).ToList();
+        return snap;
+    }
+
+    public UserInputSettings ReadUserInput()
+    {
+        var u = new UserInputSettings();
+        const string up = @"Control Panel\International\User Profile";
+        var langs = reg.Value("HKCU", up, "Languages")?.Data as string[];
+        foreach (var tag in langs ?? Array.Empty<string>())
+        {
+            var lang = new UserLanguage { Tag = tag };
+            var tips = new List<(int Order, string Tip)>();
+            foreach (var n in reg.ValueNames("HKCU", up + "\\" + tag))
+            {
+                if (!TipRx.IsMatch(n)) continue;
+                int order = 0; try { order = Convert.ToInt32(reg.Value("HKCU", up + "\\" + tag, n)?.Data ?? 0); } catch { }
+                tips.Add((order, n.ToUpperInvariant()));
+            }
+            lang.InputTips = tips.OrderBy(t => t.Order).Select(t => t.Tip).ToList();
+            u.Languages.Add(lang);
+        }
+        u.InputMethodOverride = reg.Value("HKCU", up, "InputMethodOverride")?.AsString();
+        foreach (var n in reg.ValueNames("HKCU", @"Keyboard Layout\Preload").OrderBy(n => int.TryParse(n, out var i) ? i : 999))
+        { var v = reg.Value("HKCU", @"Keyboard Layout\Preload", n)?.AsString(); if (v != null) u.Preload.Add(v.ToUpperInvariant()); }
+        foreach (var n in reg.ValueNames("HKCU", @"Keyboard Layout\Substitutes"))
+        { var v = reg.Value("HKCU", @"Keyboard Layout\Substitutes", n)?.AsString(); if (v != null) u.Substitutes[n.ToUpperInvariant()] = v.ToUpperInvariant(); }
+        return u;
+    }
+
+    void FindInstaller(KeyboardLayoutInfo info, IReadOnlyList<SoftwareItem> software)
+    {
+        var baseName = Path.GetFileNameWithoutExtension(info.LayoutFile);
+        var sw = software.FirstOrDefault(s => s.Name.Equals(info.LayoutText, StringComparison.OrdinalIgnoreCase))
+              ?? software.FirstOrDefault(s => info.DisplayName != null && s.Name.Equals(info.DisplayName, StringComparison.OrdinalIgnoreCase))
+              ?? software.FirstOrDefault(s => s.InstallationType == "MSI" && (s.Name.Contains(info.LayoutText, StringComparison.OrdinalIgnoreCase) || s.Name.Contains(baseName, StringComparison.OrdinalIgnoreCase)));
+        if (sw != null) { info.ProductName = sw.Name; if (sw.UninstallKey.StartsWith("{")) info.ProductCode = sw.UninstallKey.ToUpperInvariant(); }
+        foreach (var sid in reg.SubKeys("HKLM", InstallerUserData, RegView.Reg64))
+            foreach (var prod in reg.SubKeys("HKLM", $@"{InstallerUserData}\{sid}\Products", RegView.Reg64))
+            {
+                var ip = $@"{InstallerUserData}\{sid}\Products\{prod}\InstallProperties";
+                var name = reg.Value("HKLM", ip, "DisplayName", RegView.Reg64)?.AsString();
+                var un = reg.Value("HKLM", ip, "UninstallString", RegView.Reg64)?.AsString() ?? "";
+                bool match = (info.ProductCode != null && un.Contains(info.ProductCode, StringComparison.OrdinalIgnoreCase))
+                             || (name != null && (name.Equals(info.ProductName ?? info.LayoutText, StringComparison.OrdinalIgnoreCase) || name.Equals(info.LayoutText, StringComparison.OrdinalIgnoreCase)));
+                if (!match) continue;
+                var pkg = reg.Value("HKLM", ip, "LocalPackage", RegView.Reg64)?.AsString();
+                if (pkg != null && File.Exists(pkg)) { info.CachedMsi = pkg; info.ProductName ??= name; return; }
+            }
+    }
+
+    static void FindSources(List<KeyboardLayoutInfo> custom, IEnumerable<string> folders, CancellationToken ct)
+    {
+        var byName = custom.ToLookup(l => Path.GetFileNameWithoutExtension(l.LayoutFile), StringComparer.OrdinalIgnoreCase);
+        foreach (var root in folders.Where(Directory.Exists).Distinct(PathUtil.Comparer))
+        {
+            var stack = new Stack<(string, int)>(); stack.Push((root, 0));
+            while (stack.Count > 0)
+            {
+                ct.ThrowIfCancellationRequested();
+                var (dir, depth) = stack.Pop();
+                try
+                {
+                    foreach (var f in Directory.EnumerateFiles(dir))
+                    {
+                        var name = Path.GetFileName(f);
+                        if (name.EndsWith(".klc", StringComparison.OrdinalIgnoreCase))
+                        {
+                            var kbd = KlcName(f);
+                            var hits = kbd != null ? byName[kbd].ToList() : new();
+                            if (hits.Count == 0) hits = byName[Path.GetFileNameWithoutExtension(f)].ToList();
+                            foreach (var l in hits) if (!l.KlcSources.Contains(f, PathUtil.Comparer)) l.KlcSources.Add(f);
+                        }
+                        var m = Regex.Match(name, @"^(.+)_amd64\.msi$", RegexOptions.IgnoreCase);
+                        if (m.Success)
+                            foreach (var l in byName[m.Groups[1].Value]) if (!l.SetupPackages.Contains(f, PathUtil.Comparer)) l.SetupPackages.Add(f);
+                    }
+                    if (depth >= 6) continue;
+                    foreach (var sub in new DirectoryInfo(dir).EnumerateDirectories())
+                    {
+                        if (sub.Attributes.HasFlag(FileAttributes.ReparsePoint) || Rules.HeavyDirectoryNames.Contains(sub.Name)) continue;
+                        stack.Push((sub.FullName, depth + 1));
+                    }
+                }
+                catch (Exception ex) when (ex is UnauthorizedAccessException or IOException) { }
+            }
+        }
+    }
+
+    /// <summary>Reads the DLL name from a .klc file ("KBD&lt;TAB&gt;name&lt;TAB&gt;"description"").</summary>
+    public static string? KlcName(string path)
+    {
+        try
+        {
+            using var r = new StreamReader(path, Encoding.Unicode, detectEncodingFromByteOrderMarks: true);
+            for (int i = 0; i < 20; i++)
+            {
+                var line = r.ReadLine();
+                if (line == null) break;
+                var m = Regex.Match(line, @"^\s*KBD\s+(\S+)", RegexOptions.IgnoreCase);
+                if (m.Success) return m.Groups[1].Value;
+            }
+        }
+        catch { }
+        return null;
+    }
+
+    /// <summary>PowerShell that sets the user's language list and keyboard order exactly as captured (only tips that exist on this system).</summary>
+    public static string LanguageListScript(IEnumerable<UserLanguage> languages, Func<string, bool> tipAvailable)
+    {
+        var sb = new StringBuilder();
+        sb.AppendLine("$ErrorActionPreference = 'Stop'");
+        sb.AppendLine("$list = New-WinUserLanguageList 'en-US'");
+        sb.AppendLine("$list.Clear()");
+        foreach (var l in languages)
+        {
+            var tag = l.Tag.Replace("'", "");
+            sb.AppendLine($"$l = New-Object Microsoft.InternationalSettings.Commands.WinUserLanguage '{tag}'");
+            var tips = l.InputTips.Where(tipAvailable).ToList();
+            if (tips.Count > 0)
+            {
+                sb.AppendLine("$l.InputMethodTips.Clear()");
+                foreach (var t in tips) sb.AppendLine($"$l.InputMethodTips.Add('{t.Replace("'", "")}')");
+            }
+            sb.AppendLine("$list.Add($l)");
+        }
+        sb.AppendLine("Set-WinUserLanguageList -LanguageList $list -Force");
+        return sb.ToString();
+    }
+}
+
+/// <summary>Adds the selected layouts' installers, sources and DLLs to the migration plan.</summary>
+public sealed class KeyboardLayoutProvider : IDiscoveryProvider
+{
+    public const string ProviderId = "keyboard";
+    public string Id => ProviderId;
+    public string DisplayName => "Keyboard layouts";
+    public bool Applies(DiscoveryContext ctx) => ctx.Options.Keyboard?.Layouts.Any(l => l.Selected && l.IsCustom) == true || ctx.Options.Keyboard?.Input != null;
+
+    public ProviderOutput Discover(DiscoveryContext ctx)
+    {
+        var o = new ProviderOutput();
+        var snap = ctx.Options.Keyboard!;
+        o.Manifests["Keyboard-Layouts"] = snap;
+        foreach (var l in snap.Layouts.Where(l => l.Selected && l.IsCustom))
+        {
+            var cat = "Keyboard layouts / " + l.LayoutText;
+            if (l.CachedMsi != null)
+                o.Roots.Add(new ScanRoot { Path = Path.GetDirectoryName(l.CachedMsi)!, OnlyFiles = new() { Path.GetFileName(l.CachedMsi) }, Category = cat, ProviderId = Id, Recursive = false,
+                    Rule = _ => new FileDecision(Classification.Recommended, "Installer of this layout, taken from the Windows Installer cache"), Note = "Windows Installer cache" });
+            foreach (var setup in l.SetupPackages)
+            {
+                var dir = Path.GetDirectoryName(setup)!;
+                o.Roots.Add(new ScanRoot { Path = dir, Category = cat, ProviderId = Id, MaxDepth = 2,
+                    Rule = f => Rules.IsTempOrLock(f) ? null : new FileDecision(Classification.Recommended, "Original MSKLC setup package"), Note = "Setup package folder" });
+            }
+            foreach (var klc in l.KlcSources)
+                o.Roots.Add(new ScanRoot { Path = Path.GetDirectoryName(klc)!, OnlyFiles = new() { Path.GetFileName(klc) }, Category = cat, ProviderId = Id, Recursive = false,
+                    Rule = _ => new FileDecision(Classification.Recommended, "MSKLC source (.klc): can rebuild the layout"), Note = ".klc source" });
+            foreach (var dll in new[] { l.Dll64, l.Dll32 }.Where(d => d != null))
+                o.Roots.Add(new ScanRoot { Path = Path.GetDirectoryName(dll!)!, OnlyFiles = new() { Path.GetFileName(dll!) }, Category = cat, ProviderId = Id, Recursive = false,
+                    Rule = _ => new FileDecision(Classification.Review, "Installed layout DLL: fallback only, Windows needs the installer to register it"), Note = "Layout DLL" });
+            o.Components.Add(new Component
+            {
+                Id = "kbd-" + l.Klid, Name = $"Keyboard layout {l.LayoutText} ({l.Klid}, {l.Language})", Application = "Keyboard layouts", ProviderId = Id, Kind = "Keyboard layout",
+                Classification = Classification.Recommended, MigrationMethod = MigrationMethod.Reinstall,
+                DestinationRule = "Install with its MSI (Keyboard Layouts tab → Install selected layouts), then restore the language list",
+                VerificationMethod = "Win+Space lists the layout; typing produces the expected characters",
+                Basis = l.Evidence + " · source: " + l.BackupSource, Confidence = Confidence.Confirmed,
+                ManualActions = l.BackupState == ReadinessState.Ready ? new() : new() { "Rebuild with MSKLC (File → Load Existing Keyboard, Build DLL and Setup Package) before wiping Windows 10." }
+            });
+        }
+        o.Issues.AddRange(snap.Issues);
+        o.FunctionalTests.Add("Keyboard: press Win+Space — every restored layout is listed in the old order; type a test sentence in each (e.g. Armenian letters).");
+        return o;
+    }
+}

@@ -23,12 +23,15 @@ WORKSTATION MIGRATION TOOLKIT 4.0 — ՕԳՆՈՒԹՅՈՒՆ (Help)
  1. Software ներդիր → Discover software → ընտրեք ձեզ անհրաժեշտ ծրագրերը (օր.՝ Microsoft Office, Python, Tesseract)։
  2. User Profiles ներդիր → Discover profiles → ընտրեք պրոֆիլ(ներ)ը, ըստ ցանկության՝ օգտատիրական պանակներ
     և Custom folders (any drive)։
- 3. Migration Plan ներդիր → Generate targeted plan → դիտեք և ճշգրտեք ընտրությունը։
- 4. Backup & Recovery → 1. Backup → ընտրեք արդեն գոյություն ունեցող նպատակային պանակ → Preview / Dry run →
+ 3. Keyboard Layouts ներդիր → Discover keyboard layouts (ձեր Keyboard Layout Creator-ով ստեղծած դասավորությունները)։
+ 4. Windows Settings ներդիր → Discover Windows settings → ընտրեք պահվող կարգավորումները։
+ 5. Migration Plan ներդիր → Generate targeted plan → դիտեք և ճշգրտեք ընտրությունը։
+ 6. Backup & Recovery → 1. Backup → ընտրեք արդեն գոյություն ունեցող նպատակային պանակ → Preview / Dry run →
     Create backup։
- 5. 2. Verify and Test Restore → Verify backup → Test restore (sandbox)։
- 6. 3. Readiness → հետևեք, որ բոլոր տողերը դառնան Ready։ Միայն դրանից հետո կարելի է ջնջել Windows 10-ը։
- 7. Նոր Windows 11-ում՝ տեղադրեք ծրագրերը, բացեք այս ծրագիրը, Open package → 4. Restore։
+ 7. 2. Verify and Test Restore → Verify backup → Test restore (sandbox)։
+ 8. 3. Readiness → հետևեք, որ բոլոր տողերը դառնան Ready։ Միայն դրանից հետո կարելի է ջնջել Windows 10-ը։
+ 9. Նոր Windows 11-ում՝ տեղադրեք ծրագրերը, բացեք այս ծրագիրը, Open package → Keyboard Layouts (Install selected
+    layouts, ապա Restore language list and keyboard order) → 4. Restore (ֆայլեր) → Windows Settings (Apply selected settings)։
 
 ՄԵՆՅՈՒ
 Help — այս օգնությունը։
@@ -77,11 +80,63 @@ User data folders of the selected profiles (opt-in; scanned only when you genera
 Custom folders (any drive) — ձեր սեփական պանակները ցանկացած սկավառակից։ Add folder — ավելացնել,
   Remove folder — հեռացնել։ Իրար մեջ ներդրված պանակները ավտոմատ միավորվում են, կրկնապատճենում չկա։
 Options —
-  Windows settings (fonts, environment, PATH, default apps) — օգտատիրոջ տառատեսակներ, ոչ գաղտնի
-    միջավայրային փոփոխականներ, PATH-ի լրացումներ, ֆայլերի ասոցիացիաներ (վերջինները՝ ձեռքով վերականգնման համար)։
   Runtimes (reinstall list) — Visual C++/.NET/և այլն՝ որպես վերատեղադրման ցուցակ (ոչ թե DLL-ների պատճեն)։
   Empty folders — դատարկ պանակների ռեժիմ. լռելյայն բացառվում են, կարելի է պահել ծրագրային կարգավորումների
     ներսում կամ բոլորը։ Անհասանելի պանակը երբեք «դատարկ» չի համարվում։
+
+========================================
+ՆԵՐԴԻՐ Keyboard Layouts (ստեղնաշարի դասավորություններ)
+========================================
+Microsoft Keyboard Layout Creator (MSKLC) գործիքով ստեղծված դասավորությունները Windows-ում տեղադրվում են որպես
+ծրագիր (MSI)։ Դրանց DLL ֆայլը պատճենելը բավարար չէ. Windows-ը պետք է դրանք գրանցի։ Դրա համար ծրագիրը պահում է
+դասավորությունը վերատեղադրելու բոլոր հնարավոր աղբյուրները.
+  1) սկզբնական setup փաթեթը (setup.exe + *_amd64.msi), եթե գտնվի ձեր պանակներում,
+  2) Windows-ի Installer cache-ում պահված նույն MSI-ն (նույնիսկ եթե սկզբնականը կորել է),
+  3) .klc աղբյուր ֆայլը (MSKLC-ով նորից կառուցելու համար),
+  4) տեղադրված DLL-ը՝ որպես վերջին պահուստ։
+Discover keyboard layouts — գտնում է դասավորությունները, ձեր լեզուների ցանկն ու դասավորությունների հերթականությունը։
+  .klc և setup փաթեթները որոնվում են ընտրված պրոֆիլների Documents, Desktop, Downloads և Custom folders պանակներում։
+Select custom layouts — ընտրում է ձեր ստեղծած (ոչ Windows-ի) բոլոր դասավորությունները։   Clear — հանում է ընտրությունը։
+Սյունակներ. Selected, Layout (անուն), KLID (Windows-ի նույնացուցիչ, օր.՝ A000042B), Language, Custom
+  (Yes — ձերն է, No (Windows) — Windows-ինն է), In your list (միացված է ձեզ մոտ), Best backup source (ինչով է
+  վերականգնվելու), Layout file (DLL), Why custom (ինչու է համարվել ձերը)։
+  Եթե Best backup source-ը «Layout DLL only» է, Windows 10-ը ջնջելուց ԱՌԱՋ բացեք MSKLC → File → Load Existing
+  Keyboard → ընտրեք դասավորությունը → Save As (.klc) → Project → Build DLL and Setup Package, ապա նորից սեղմեք Discover։
+Restore from package (նոր Windows-ում, փաթեթը բացելուց հետո Backup & Recovery-ում).
+  Install selected layouts — գործարկում է փաթեթում պահված MSI-ն (Windows-ը կխնդրի administrator-ի թույլտվություն)։
+    Արդեն տեղադրվածը չի կրկնվում։ Կարող է պահանջվել վերագործարկում։
+  Restore language list and keyboard order — վերականգնում է լեզուների ցանկն ու դասավորությունների հերթականությունը։
+    Սեղմեք այն միայն դասավորությունները տեղադրելուց հետո (չտեղադրվածները բաց են թողնվում)։
+  Սյունակներ՝ Install, Layout, KLID, What will happen։
+
+========================================
+ՆԵՐԴԻՐ Windows Settings (Windows-ի կարգավորումներ)
+========================================
+Կարդացվում են միայն ներկայումս մուտք գործած օգտատիրոջ կարգավորումները։ Ոչինչ չի փոխվում։
+Discover Windows settings — հավաքում է կարգավորումները հետևյալ խմբերով (Group).
+  Language and formats — ամսաթվի/թվերի/արժույթի ձևաչափ, լեզուների և դասավորությունների ցանկ, լեզվի փոխման
+    ստեղներ, ժամային գոտի, ոչ-Unicode ծրագրերի լեզու (system locale)։
+  Interface — Explorer-ի պարամետրեր (ֆայլերի ընդլայնումներ, թաքնված ֆայլեր, taskbar), մկնիկ, ստեղնաշարի
+    արագություն, պտտում և cursor, մուգ/բաց ռեժիմ և գույն, accessibility, cursor-ների սխեմա, պաստառ։
+  Network and printers — Wi-Fi պրոֆիլներ (ԱՌԱՆՑ գաղտնաբառի. միանալիս մեկ անգամ կմուտքագրեք), ցանցային
+    սկավառակներ (Z: և այլն), ցանցային տպիչներ, տեղական տպիչների ցանկ (ձեռքով), լռելյայն տպիչ, hosts ֆայլ։
+  System — էներգախնայողության պլան, ձեր Scheduled Tasks-ը (ծրագրերի ստեղծածները նշված են InstallerManaged),
+    մուտքի ժամանակ գործարկվող ծրագրեր (Run և Startup պանակ)։
+  Fonts — ձեր տեղադրած տառատեսակները (և համակարգային պանակում ավելի ուշ ավելացվածները՝ Review)։
+  Environment — միջավայրի փոփոխականներ (գաղտնի անուններով չեն արտահանվում), PATH, Default apps (ձեռքով)։
+Select Recommended settings — ընտրում է Recommended կարգավորումները։   Clear — հանում է ընտրությունը։
+Group — ցուցադրում է միայն մեկ խումբ։
+Սյունակներ. Selected, Group, Setting, Value (ներկա արժեք), How it is restored, Administrator (պետք է
+  administrator), Sign-out (երևում է նորից մուտք գործելուց հետո), Class, Note։
+Restore from package (նոր Windows-ում).
+  Dry run settings — ցույց է տալիս, թե ինչ կփոխվի (What will happen)։ Ոչինչ չի փոխում։ Արդեն նույնը եղածները նշվում են։
+  Apply selected settings — կիրառում է նշվածները հաստատումից հետո։ Registry-ի հին արժեքները պահվում են։
+    Administrator պահանջող քայլերի համար Windows-ը ինքը կհարցնի թույլտվություն։
+  Undo last settings restore — վերադարձնում է registry-ի արժեքներն ու պատճենված ֆայլերը. հրամաններով արվածների
+    (Wi-Fi, տպիչ, task) համար ցույց է տալիս, թե ինչպես հետ բերել ձեռքով։
+  Սյունակներ՝ Apply, Group, Setting, What will happen, Administrator, Sign-out։
+Ինչը չի վերականգնվում ավտոմատ. Default apps (Windows-ը պաշտպանում է), տեղական տպիչների դրայվերներ,
+Start/taskbar-ի ամրացված պատկերակներ (Windows 10-ից 11 չեն փոխանցվում)։
 
 ========================================
 ՆԵՐԴԻՐ Migration Plan

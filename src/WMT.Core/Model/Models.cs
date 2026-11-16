@@ -33,6 +33,8 @@ public sealed class SoftwareItem
     public string InstallationType { get; set; } = UnknownText;
     public string InstallLocation { get; set; } = UnknownText;
     public string DetectedSource { get; set; } = "";
+    /// <summary>Uninstall registry key name (MSI ProductCode for Windows Installer packages).</summary>
+    public string UninstallKey { get; set; } = "";
     /// <summary>Application / Runtime / Office / Python / OCR / Development / Portable / System.</summary>
     public string Category { get; set; } = "Application";
     public string RecoveryMethod { get; set; } = "Reinstall";
@@ -79,6 +81,8 @@ public sealed class ScanRoot
     /// <summary>Decides class/note for a file; null result = not eligible (excluded).</summary>
     [JsonIgnore] public Func<FileCandidate, FileDecision?> Rule { get; set; } = _ => new FileDecision(Classification.Recommended, null);
     public string Note { get; set; } = "";
+    /// <summary>When set, only these file names directly in <see cref="Path"/> are indexed (no folder enumeration).</summary>
+    public List<string>? OnlyFiles { get; set; }
 }
 
 public readonly record struct FileCandidate(string FullPath, string Name, string Extension, long Length, DateTime LastWriteUtc, FileAttributes Attributes, string RelativeToRoot);

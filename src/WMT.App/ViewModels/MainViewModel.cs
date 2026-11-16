@@ -36,7 +36,7 @@ public sealed partial class MainViewModel : ObservableObject
         runner = new JobRunner(log);
         tail = new LogTail(log.FilePath, startAtEnd: true);
         CancelCommand = new RelayCommand(Cancel, () => IsBusy);
-        InitSoftware(); InitProfiles(); InitPlan(); InitBackup();
+        InitSoftware(); InitProfiles(); InitKeyboard(); InitSettings(); InitPlan(); InitBackup();
         log.Info("app.started", $"WMT {Toolkit.Version} started (build {Toolkit.BuildId}). Nothing is scanned until you press a Discover button.");
     }
 

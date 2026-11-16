@@ -108,6 +108,17 @@ license keys and activation data were NOT exported.
             h.Append("<p>Optional: <code>winget import -i \"Manifests\\Winget-Export.json\"</code> reinstalls programs available in winget (review first).</p>");
         }
 
+        Step("Keyboard layouts (before restoring the language list)");
+        var kbd = pkg.Keyboard?.Layouts.Where(l => l.Selected && l.IsCustom).ToList() ?? new();
+        if (kbd.Count == 0) { t.AppendLine("  No custom keyboard layouts selected."); h.Append("<p>No custom keyboard layouts selected.</p>"); }
+        foreach (var l in kbd)
+        {
+            var inst = KeyboardRestore.InstallerInPackage(pkg, l);
+            t.AppendLine($"  {l.LayoutText} ({l.Klid}, {l.Language}): " + (inst != null ? $"run {inst} (Keyboard Layouts tab → Install selected layouts)" : l.KlcSources.Count > 0 ? "rebuild from .klc with MSKLC" : "NO installer — rebuild with MSKLC before wiping Windows 10"));
+        }
+        h.Append(Table(new[] { "Layout", "KLID", "Language", "Best source", "Installer in package" },
+            kbd.Select(l => new[] { l.LayoutText, l.Klid, l.Language, l.BackupSource, KeyboardRestore.InstallerInPackage(pkg, l) ?? "—" })));
+
         Step("Restore files");
         var cats = pkg.Files.Where(f => f.Selected).GroupBy(f => f.Category).OrderBy(g => g.Key).ToList();
         foreach (var g in cats) t.AppendLine($"  {g.Key}: {g.Count()} files ({PathUtil.FormatBytes(g.Sum(f => f.Size))}) — {g.First().DestinationRule}");
@@ -131,10 +142,10 @@ license keys and activation data were NOT exported.
         t.AppendLine($"  {pkg.Registry.Count} values in Manifests\\Registry-REVIEW-ONLY\\Registry.json. Apply only those you need, one by one, with the toolkit (journaled, undoable) or by hand.");
         h.Append(Table(new[] { "Key", "Value", "Type", "Data", "Note" }, pkg.Registry.Take(500).Select(x => new[] { "HKCU\\" + x.KeyPath, x.ValueName, x.Type, x.Data ?? string.Join("; ", x.MultiData ?? new()), x.Note })));
 
-        Step("Windows settings");
-        var win = pkg.Components.Where(c => c.Application == "Windows").ToList();
-        foreach (var c in win) t.AppendLine($"  {c.Name}: {string.Join(" ", c.ManualActions)}");
-        h.Append(Table(new[] { "Item", "Action" }, win.Select(c => new[] { c.Name, string.Join(" ", c.ManualActions.Append(c.DestinationRule)) })));
+        Step("Windows settings (Windows Settings tab → Restore from package)");
+        var items = pkg.WindowsSettings?.Items.Where(i => i.Selected).ToList() ?? new();
+        foreach (var i in items) t.AppendLine($"  [{i.Group}] {i.Name}: {i.RestoreMethod}{(i.RequiresAdmin ? " (administrator)" : "")}{(i.RequiresSignOut ? " (sign out/in)" : "")}");
+        h.Append(Table(new[] { "Group", "Setting", "Value", "How it is restored" }, items.Select(i => new[] { i.Group, i.Name, i.Summary, i.RestoreMethod + (i.RequiresAdmin ? " · administrator" : "") + (i.RequiresSignOut ? " · sign out/in" : "") })));
 
         Step("Test that everything works (functional checklist)");
         foreach (var f in pkg.FunctionalTests) t.AppendLine("  [ ] " + f);

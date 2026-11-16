@@ -19,7 +19,8 @@ public sealed class MigrationPlan
     public List<string> FunctionalTests { get; set; } = new();
     public OfficeEnvironment? Office { get; set; }
     public PythonInventory? Python { get; set; }
-    public object? WindowsSettings { get; set; }
+    public WindowsSettingsSnapshot? WindowsSettings { get; set; }
+    public KeyboardSnapshot? Keyboard { get; set; }
     public Dictionary<string, object> VbaAnalyses { get; set; } = new();
     public List<string> ProvidersRun { get; set; } = new();
 
@@ -40,7 +41,7 @@ public sealed class PlanBuilder
 {
     public static IReadOnlyList<IDiscoveryProvider> DefaultProviders() => new IDiscoveryProvider[]
     {
-        new WordProvider(), new PythonProvider(), new PortableProvider(), new RuntimeProvider(), new WindowsSettingsProvider(),
+        new WordProvider(), new PythonProvider(), new PortableProvider(), new RuntimeProvider(), new KeyboardLayoutProvider(), new WindowsSettingsProvider(),
         new CustomPathsProvider(), new UserDataProvider()
     };
 
@@ -109,7 +110,8 @@ public sealed class PlanBuilder
         plan.FunctionalTests = all.FunctionalTests.Distinct().ToList();
         plan.Office = ctx.Office ?? (all.Manifests.TryGetValue("Office-Environment", out var off) ? off as OfficeEnvironment : null);
         plan.Python = all.Manifests.TryGetValue("Python-Environments", out var py) ? py as PythonInventory : null;
-        plan.WindowsSettings = all.Manifests.TryGetValue("Windows-Settings", out var ws) ? ws : null;
+        plan.WindowsSettings = all.Manifests.TryGetValue("Windows-Settings", out var ws) ? ws as WindowsSettingsSnapshot : null;
+        plan.Keyboard = all.Manifests.TryGetValue("Keyboard-Layouts", out var kb) ? kb as KeyboardSnapshot : null;
         foreach (var kv in all.Manifests.Where(k => k.Key.StartsWith("VBA:"))) plan.VbaAnalyses[kv.Key[4..]] = kv.Value;
         foreach (var c in plan.Components) c.State = LifecycleState.Planned;
 

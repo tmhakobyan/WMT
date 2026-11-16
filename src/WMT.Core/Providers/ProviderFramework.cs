@@ -17,6 +17,10 @@ public sealed class DiscoveryOptions
     public bool QueryPythonPackages { get; set; } = true;
     public TimeSpan PythonTimeout { get; set; } = TimeSpan.FromSeconds(90);
     public EmptyFolderMode EmptyFolders { get; set; } = EmptyFolderMode.ExcludeEmpty;
+    /// <summary>Keyboard layouts tab result (selection included); null when that tab was not used.</summary>
+    public KeyboardSnapshot? Keyboard { get; set; }
+    /// <summary>Windows Settings tab result (selection included); null = capture defaults during planning.</summary>
+    public WindowsSettingsSnapshot? WindowsSettings { get; set; }
     /// <summary>PKG-008: never scanned (the backup destination / existing packages).</summary>
     public List<string> ExcludedPaths { get; set; } = new();
 }

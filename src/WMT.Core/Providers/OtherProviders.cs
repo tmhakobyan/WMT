@@ -128,72 +128,39 @@ public sealed class RuntimeProvider : IDiscoveryProvider
     }
 }
 
-/// <summary>SYS-003: fonts, non-secret environment variables, PATH additions, file associations (current user only).</summary>
+/// <summary>SYS-003: the selected Windows settings of the signed-in user (Windows Settings tab), plus the files they need.</summary>
 public sealed class WindowsSettingsProvider : IDiscoveryProvider
 {
     public const string ProviderId = "windows";
     public string Id => ProviderId;
     public string DisplayName => "Windows settings";
-    static readonly string[] AssocExts = { ".doc", ".docx", ".docm", ".dot", ".dotx", ".dotm", ".rtf", ".txt", ".pdf", ".py", ".ipynb", ".csv", ".xlsx", ".tif", ".tiff", ".png", ".jpg" };
-    public bool Applies(DiscoveryContext ctx) => ctx.Options.IncludeWindowsSettings && ctx.SelectedProfiles.Count > 0;
+    public bool Applies(DiscoveryContext ctx) => ctx.Options.IncludeWindowsSettings && (ctx.Options.WindowsSettings != null || ctx.SelectedProfiles.Any(p => p.IsCurrentUser));
 
     public ProviderOutput Discover(DiscoveryContext ctx)
     {
         var o = new ProviderOutput();
-        var settings = new List<object>();
-        foreach (var p in ctx.SelectedProfiles)
+        var snap = ctx.Options.WindowsSettings ?? new WindowsSettingsCapture(new SettingsCaptureEnvironment
+        { Registry = ctx.Registry, Processes = ctx.Processes, Token = ctx.Token }).Capture(ctx.Progress);
+        o.Manifests["Windows-Settings"] = snap;
+        o.Issues.AddRange(snap.Issues);
+        foreach (var i in snap.Items.Where(i => i.Selected))
         {
-            if (p.Access == AccessState.Accessible)
+            var cat = "Windows settings / " + i.Group;
+            if (i.Kind is SettingKinds.Font or SettingKinds.Wallpaper && i.SourcePath != null && File.Exists(i.SourcePath))
+                o.Roots.Add(new ScanRoot { Path = Path.GetDirectoryName(i.SourcePath)!, OnlyFiles = new() { Path.GetFileName(i.SourcePath) }, Category = cat, ProviderId = Id,
+                    ProfileSid = snap.ProfileSid, Recursive = false, Rule = _ => new FileDecision(Classification.Recommended, i.Name), Note = i.Name });
+            if (i.Kind == SettingKinds.StartupFolder && i.SourcePath != null)
+                o.Roots.Add(new ScanRoot { Path = i.SourcePath, Category = cat + " / Startup folder", ProviderId = Id, ProfileSid = snap.ProfileSid, Recursive = false,
+                    Rule = f => f.Name.Equals("desktop.ini", StringComparison.OrdinalIgnoreCase) ? null : new FileDecision(Classification.Recommended, "Startup shortcut"), Note = "Startup folder" });
+            o.Components.Add(new Component
             {
-                var f = ProfileFolders.Resolve(p, ctx);
-                var fonts = Path.Combine(f.Local, @"Microsoft\Windows\Fonts");
-                if (Directory.Exists(fonts))
-                    o.Roots.Add(new ScanRoot { Path = fonts, Category = $"Windows / {UserDataProvider.ShortAccount(p)} / Fonts installed for this user", ProviderId = Id, ProfileSid = p.Sid, Recursive = false,
-                        Rule = Rules.Extensions(Classification.Review, "User-installed font: check that its license allows installing it again", ".ttf", ".otf", ".ttc", ".fon", ".fnt"),
-                        Note = "Per-user fonts" });
-            }
-            var hive = ctx.UserHive(p);
-            if (hive == null) { o.Issues.Add(new Issue(IssueSeverity.Info, "Windows settings", $"Environment variables and associations of {p.Account} were not read (hive not loaded).")); continue; }
-            var (h, pre) = hive.Value;
-            var envVars = new List<object>();
-            foreach (var name in ctx.Registry.ValueNames(h, pre + "Environment"))
-            {
-                var v = ctx.Registry.Value(h, pre + "Environment", name);
-                if (v == null) continue;
-                if (Redaction.LooksSecretName(name)) { envVars.Add(new { Name = name, Value = "[not exported: name suggests a secret]", Kind = v.Kind }); continue; }
-                envVars.Add(new { Name = name, Value = v.AsString(), Kind = v.Kind });
-                if (name.Equals("Path", StringComparison.OrdinalIgnoreCase))
-                {
-                    foreach (var entry in (v.AsString() ?? "").Split(';', StringSplitOptions.RemoveEmptyEntries))
-                        o.Components.Add(new Component
-                        {
-                            Id = "path-" + PathUtil.StableId(p.Sid + entry), Name = "PATH entry: " + entry, Application = "Windows", ProviderId = Id, Kind = "User PATH entry",
-                            Classification = Classification.Review, MigrationMethod = MigrationMethod.ApplySetting, ProfileSid = p.Sid,
-                            DestinationRule = "Add to the target user's PATH if the folder exists there",
-                            VerificationMethod = "Open a new terminal; the program in this folder starts by name", Basis = "HKCU\\Environment\\Path", Confidence = Confidence.Confirmed,
-                            ManualActions = { "Settings → System → About → Advanced system settings → Environment Variables" }
-                        });
-                }
-            }
-            var assoc = new List<object>();
-            foreach (var ext in AssocExts)
-            {
-                var prog = ctx.Registry.Value(h, pre + $@"Software\Microsoft\Windows\CurrentVersion\Explorer\FileExts\{ext}\UserChoice", "ProgId")?.AsString();
-                if (prog != null) assoc.Add(new { Extension = ext, ProgId = prog });
-            }
-            if (assoc.Count > 0)
-                o.Components.Add(new Component
-                {
-                    Id = "assoc-" + PathUtil.StableId(p.Sid), Name = $"Default apps of {UserDataProvider.ShortAccount(p)} ({assoc.Count} file types)", Application = "Windows", ProviderId = Id,
-                    Kind = "File associations", Classification = Classification.Unsupported, MigrationMethod = MigrationMethod.ManualCheck, ProfileSid = p.Sid,
-                    DestinationRule = "Set manually: Windows protects default-app choices", VerificationMethod = "Double-click a file of each type",
-                    Basis = "UserChoice registry values", Confidence = Confidence.Confirmed,
-                    ManualActions = { "Settings → Apps → Default apps: set the programs listed in Windows-Settings.json" }
-                });
-            settings.Add(new { Profile = p.Sid, Account = p.Account, EnvironmentVariables = envVars, FileAssociations = assoc });
+                Id = "win-" + i.Id, Name = i.Name, Application = "Windows", ProviderId = Id, Kind = "Windows setting: " + i.Group, Classification = i.Classification,
+                MigrationMethod = i.Kind == SettingKinds.Manual ? MigrationMethod.ManualCheck : MigrationMethod.ApplySetting, ProfileSid = snap.ProfileSid,
+                DestinationRule = i.RestoreMethod, VerificationMethod = "Check the setting in Windows Settings after sign-in", Basis = i.Summary, Confidence = Confidence.Confirmed,
+                ManualActions = i.Kind == SettingKinds.Manual ? new() { i.RestoreMethod } : new()
+            });
         }
-        o.Manifests["Windows-Settings"] = settings;
-        o.FunctionalTests.Add("Windows: your fonts appear in Word's font list; your environment variables/PATH entries exist; file types open in the right programs.");
+        o.FunctionalTests.Add("Windows: languages and keyboard order, date/number formats, Explorer options, Wi-Fi, mapped drives, printers and fonts look as before.");
         return o;
     }
 }

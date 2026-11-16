@@ -106,6 +106,8 @@ public sealed partial class MainViewModel
                 issues.Add(new Issue(IssueSeverity.Warning, "Independence", "A backup on the same physical disk as Windows (for example another partition such as G:) is NOT an independent backup. Copy the package to another device before reinstalling Windows."));
         }
         else issues.Add(new Issue(IssueSeverity.Warning, "Destination", "Choose an existing destination folder."));
+        if (keyboard == null) issues.Add(new Issue(IssueSeverity.Warning, "Keyboard layouts", "The Keyboard Layouts tab was not used: custom keyboard layouts are NOT in this backup."));
+        if (settings == null) issues.Add(new Issue(IssueSeverity.Warning, "Windows settings", "The Windows Settings tab was not used: Windows settings are NOT in this backup."));
         if (PlanIsStale) issues.Add(new Issue(IssueSeverity.Warning, "Plan", "The selection changed after the plan was generated: generate the plan again."));
         issues.AddRange(plan.Issues.Where(i => i.Severity >= IssueSeverity.Warning));
         foreach (var i in issues.OrderByDescending(i => i.Severity)) PreviewIssues.Add(i);
@@ -170,6 +172,7 @@ public sealed partial class MainViewModel
             FunctionalChecks.Clear();
             foreach (var f in loadedPackage.FunctionalTests) FunctionalChecks.Add(new CheckRow { Text = f });
             restorePlan = null; RestoreFileOps.Clear(); RestoreRegistryOps.Clear(); PrerequisiteIssues.Clear();
+            SettingActionRows.Clear(); RefreshKeyboardRestore();
             Raise(nameof(HasPackage));
             RefreshReadiness();
         }
