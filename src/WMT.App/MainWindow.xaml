@@ -8,7 +8,7 @@
             <RowDefinition Height="Auto" />
             <RowDefinition Height="*" MinHeight="300" />
             <RowDefinition Height="Auto" />
-            <RowDefinition Height="140" MinHeight="50" />
+            <RowDefinition Height="110" MinHeight="50" />
             <RowDefinition Height="Auto" />
         </Grid.RowDefinitions>
 
@@ -168,9 +168,9 @@
                     <Grid.RowDefinitions>
                         <RowDefinition Height="Auto" />
                         <RowDefinition Height="Auto" />
-                        <RowDefinition Height="*" />
+                        <RowDefinition Height="*" MinHeight="220" />
                         <RowDefinition Height="Auto" />
-                        <RowDefinition Height="110" MinHeight="30" />
+                        <RowDefinition Height="90" MinHeight="30" />
                     </Grid.RowDefinitions>
                     <WrapPanel Grid.Row="0" IsEnabled="{Binding IsIdle}">
                         <Button Content="Generate targeted plan" Command="{Binding GeneratePlanCommand}" FontWeight="SemiBold" />
@@ -210,18 +210,20 @@
                             <WrapPanel DockPanel.Dock="Top">
                                 <Button Content="Up" Command="{Binding UpCommand}" />
                                 <TextBlock Text="Search:" VerticalAlignment="Center" Margin="4,0,4,6" />
-                                <TextBox Width="150" Margin="0,0,8,6" Text="{Binding ExplorerSearch, UpdateSourceTrigger=PropertyChanged, Delay=300}" />
+                                <TextBox Width="130" Margin="0,0,8,6" Text="{Binding ExplorerSearch, UpdateSourceTrigger=PropertyChanged, Delay=300}" />
                                 <TextBlock Text="View:" VerticalAlignment="Center" Margin="0,0,4,6" />
-                                <ComboBox Width="130" Margin="0,0,8,6" ItemsSource="{Binding ViewModes}" SelectedItem="{Binding ViewMode}" />
+                                <ComboBox Width="118" Margin="0,0,8,6" ItemsSource="{Binding ViewModes}" SelectedItem="{Binding ViewMode}" />
                                 <TextBlock Text="Sort:" VerticalAlignment="Center" Margin="0,0,4,6" />
-                                <ComboBox Width="80" Margin="0,0,4,6" ItemsSource="{Binding SortModes}" SelectedItem="{Binding SortMode}" />
-                                <CheckBox Content="Descending" IsChecked="{Binding SortDescending}" VerticalAlignment="Center" Margin="0,0,8,6" />
-                                <Button Content="Previous page" Command="{Binding PrevPageCommand}" />
-                                <Button Content="Next page" Command="{Binding NextPageCommand}" />
+                                <ComboBox Width="68" Margin="0,0,4,6" ItemsSource="{Binding SortModes}" SelectedItem="{Binding SortMode}" />
+                                <CheckBox Content="Descending" IsChecked="{Binding SortDescending}" VerticalAlignment="Center" Margin="0,0,0,6" />
                             </WrapPanel>
                             <TextBlock DockPanel.Dock="Top" Text="{Binding CurrentPath}" Foreground="#FF333399" TextTrimming="CharacterEllipsis" Margin="0,0,0,2" />
-                            <TextBlock DockPanel.Dock="Bottom" Text="{Binding PageText}" Foreground="Gray" Margin="0,2,0,0" />
-                            <Grid>
+                            <DockPanel DockPanel.Dock="Bottom" Margin="0,3,0,0">
+                                <Button Content="Previous page" Command="{Binding PrevPageCommand}" Margin="0,0,4,0" Padding="6,1" MinHeight="22" />
+                                <Button Content="Next page" Command="{Binding NextPageCommand}" Margin="0,0,6,0" Padding="6,1" MinHeight="22" />
+                                <TextBlock Text="{Binding PageText}" Foreground="Gray" VerticalAlignment="Center" TextTrimming="CharacterEllipsis" />
+                            </DockPanel>
+                            <Grid MinHeight="110">
                                 <DataGrid x:Name="DetailsList" ItemsSource="{Binding ExplorerItems}" SelectedItem="{Binding SelectedExplorerItem}" SelectionMode="Single"
                                           Visibility="{Binding IsDetailsView, Converter={StaticResource B2V}}" MouseDoubleClick="OnExplorerDoubleClick" CanUserSortColumns="False">
                                     <DataGrid.Columns>
@@ -434,13 +436,12 @@
                         <Grid Margin="6">
                             <Grid.RowDefinitions>
                                 <RowDefinition Height="Auto" />
-                                <RowDefinition Height="100" MinHeight="50" />
+                                <RowDefinition Height="80" MinHeight="50" />
                                 <RowDefinition Height="Auto" />
                                 <RowDefinition Height="Auto" />
-                                <RowDefinition Height="*" MinHeight="80" />
+                                <RowDefinition Height="*" MinHeight="120" />
                                 <RowDefinition Height="Auto" />
-                                <RowDefinition Height="140" MinHeight="40" />
-                                <RowDefinition Height="Auto" />
+                                <RowDefinition Height="105" MinHeight="60" />
                             </Grid.RowDefinitions>
                             <TextBlock Grid.Row="0" TextWrapping="Wrap" Margin="0,0,0,4"
                                        Text="Run this on the NEW Windows after installing your programs. 1) Choose the target profile for every source profile. 2) Check prerequisites. 3) Dry run. 4) Untick what you do not want. 5) Restore. Nothing is overwritten unless you allow it; registry values are applied only when ticked one by one." />
@@ -524,15 +525,15 @@
                             </TabControl>
                             <GridSplitter Grid.Row="5" Style="{StaticResource HSplit}" />
                             <GroupBox Grid.Row="6" Header="Functional test checklist (file restore is not the same as a working program)">
+                                <DockPanel>
+                                <Button DockPanel.Dock="Right" VerticalAlignment="Top" Content="Save functional test results" Command="{Binding SaveFunctionalCommand}" Margin="6,2,0,0" />
                                 <ListBox ItemsSource="{Binding FunctionalChecks}">
                                     <ListBox.ItemTemplate>
                                         <DataTemplate><CheckBox IsChecked="{Binding Done}" Content="{Binding Text}" /></DataTemplate>
                                     </ListBox.ItemTemplate>
                                 </ListBox>
+                                </DockPanel>
                             </GroupBox>
-                            <WrapPanel Grid.Row="7" Margin="0,4,0,0">
-                                <Button Content="Save functional test results" Command="{Binding SaveFunctionalCommand}" />
-                            </WrapPanel>
                         </Grid>
                     </TabItem>
                 </TabControl>

@@ -139,7 +139,7 @@ public sealed class SoftwareDiscovery
     {
         if (category == "Runtime")
         {
-            if (VcVersionRx.IsMatch(name)) return "https://learn.microsoft.com/cpp/windows/latest-supported-vc-redist";
+            if (Regex.IsMatch(name, @"Visual C\+\+", RegexOptions.IgnoreCase)) return "https://learn.microsoft.com/cpp/windows/latest-supported-vc-redist";
             if (Regex.IsMatch(name, @"\.NET|Desktop Runtime|ASP\.NET", RegexOptions.IgnoreCase))
             {
                 if (Regex.IsMatch(name, "Framework", RegexOptions.IgnoreCase)) return "https://dotnet.microsoft.com/download/dotnet-framework";

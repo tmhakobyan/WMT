@@ -44,6 +44,9 @@ public class SoftwareDiscoveryTests
     [InlineData("7-Zip 23.01 (x64)", "Application")]
     public void Classification(string name, string cat) => Assert.Equal(cat, SoftwareDiscovery.Classify(name));
 
+    [Fact] public void Vc_runtime_v14_naming_gets_official_source()
+        => Assert.NotNull(SoftwareDiscovery.OfficialSourceFor("Microsoft Visual C++ v14 Redistributable (x64) - 14.44.35211", "Runtime", "14.44.35211.0", "x64"));
+
     [Fact] public void Office_and_Python_get_providers_and_runtime_gets_reinstall_not_copy()
     {
         var r = Scan(new FakeUninstall().Add("Microsoft Office Professional Plus 2016", "16.0.4266.1001").Add("Python 3.11.9 (64-bit)", "3.11.9150.0").Add("Microsoft Visual C++ 2015-2022 Redistributable (x64) - 14.38.33135", "14.38.33135.0"));
