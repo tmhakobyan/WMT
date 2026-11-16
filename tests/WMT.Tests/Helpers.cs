@@ -15,7 +15,7 @@ static class T
     public static string Write(string path, string text = "x")
     {
         Directory.CreateDirectory(Path.GetDirectoryName(path)!);
-        File.WriteAllText(path, text, Encoding.UTF8);
+        File.WriteAllText(path, text, new UTF8Encoding(false));
         return path;
     }
     public static string Fixture(string name) => Path.Combine(AppContext.BaseDirectory, "Fixtures", name);

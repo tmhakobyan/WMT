@@ -86,7 +86,7 @@ public class BackupTests
             if (f.SourcePath.EndsWith("file3.txt") && corruptions++ == 0) File.AppendAllText(partial, "CORRUPT");
         });
         Assert.Equal("Complete", r.Status);
-        Assert.Equal(1, corruptions);
+        Assert.Equal(2, corruptions); // attempt 1 corrupted and rejected, attempt 2 clean and accepted
         var r2 = T.Backup(plan, T.Temp("dest2"), setup: e => e.AfterPartialWritten = (f, partial) => { if (f.SourcePath.EndsWith("file3.txt")) File.AppendAllText(partial, "X"); });
         Assert.Equal("Incomplete", r2.Status);
         var files = Json.ReadFile<List<FileEntry>>(Path.Combine(r2.PackagePath, "Manifests", "Files.json"));

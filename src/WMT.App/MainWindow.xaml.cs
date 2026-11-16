@@ -32,10 +32,17 @@ public partial class MainWindow : Window
     public TabControl Tabs => MainTabs;
     public TabControl RecoveryTabs => BackupTabs;
 
+    bool scrollPending;
     void OnLogChanged(object? s, NotifyCollectionChangedEventArgs e)
     {
-        if (e.Action == NotifyCollectionChangedAction.Add && LogList.Items.Count > 0)
-            LogList.ScrollIntoView(LogList.Items[LogList.Items.Count - 1]);
+        // Never touch the ListBox layout inside CollectionChanged: scroll once, after the batch, at Background priority.
+        if (e.Action != NotifyCollectionChangedAction.Add || scrollPending) return;
+        scrollPending = true;
+        Dispatcher.BeginInvoke(DispatcherPriority.Background, new Action(() =>
+        {
+            scrollPending = false;
+            if (LogList.Items.Count > 0) LogList.ScrollIntoView(LogList.Items[LogList.Items.Count - 1]);
+        }));
     }
 
     void OnExplorerDoubleClick(object sender, MouseButtonEventArgs e)
