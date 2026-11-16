@@ -217,6 +217,12 @@ public class WindowsSettingsTests
         Assert.False(dry.Single(a => a.Name.Contains("Regional")).Blocked);
         Assert.False(dry.Single(a => a.Kind == SettingKinds.Font).Blocked);
         Assert.True(dry.Single(a => a.Kind == SettingKinds.Wallpaper).Blocked);
+        Assert.False(dry.Single(a => a.Kind == SettingKinds.SystemLocale).Blocked);
+        target.Set("HKLM", @"SYSTEM\CurrentControlSet\Control\Nls\Language", "Default", "String", "042b", RegView.Reg64);
+        target.Set("HKLM", @"SYSTEM\CurrentControlSet\Control\TimeZoneInformation", "TimeZoneKeyName", "String", "Caucasus Standard Time", RegView.Reg64);
+        var dry2 = engine.DryRun(req);
+        Assert.True(dry2.Single(a => a.Kind == SettingKinds.SystemLocale).Blocked);
+        Assert.True(dry2.Single(a => a.Kind == SettingKinds.TimeZone).Blocked);
         Assert.Equal(@"C:\Tools", target.Value("HKCU", "Environment", "Path")!.AsString());
 
         var chosen = dry.Where(a => a.Kind is SettingKinds.PathMerge or SettingKinds.Registry or SettingKinds.MappedDrive or SettingKinds.WiFi or SettingKinds.Font or SettingKinds.Hosts).ToList();

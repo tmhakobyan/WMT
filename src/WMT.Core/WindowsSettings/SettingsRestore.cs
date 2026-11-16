@@ -81,6 +81,20 @@ public sealed class SettingsRestoreEngine
     static string Remap(string? text, SettingsRestoreRequest r) =>
         text == null || string.IsNullOrEmpty(r.Snapshot.ProfilePath) ? text ?? "" : text.Replace(r.Snapshot.ProfilePath!, r.TargetProfilePath, StringComparison.OrdinalIgnoreCase);
 
+    bool SameLanguages(SettingItem i)
+    {
+        var cur = new KeyboardLayoutDiscovery(reader).ReadUserInput().Languages;
+        var want = i.Languages ?? new();
+        return cur.Count == want.Count && cur.Zip(want).All(p => p.First.Tag.Equals(p.Second.Tag, StringComparison.OrdinalIgnoreCase)
+            && p.First.InputTips.SequenceEqual(p.Second.InputTips, StringComparer.OrdinalIgnoreCase));
+    }
+
+    string? CurrentSystemLocale()
+    {
+        var hex = reader.Value("HKLM", @"SYSTEM\CurrentControlSet\Control\Nls\Language", "Default", RegView.Reg64)?.AsString();
+        try { return hex == null ? null : System.Globalization.CultureInfo.GetCultureInfo(Convert.ToInt32(hex, 16)).Name; } catch { return null; }
+    }
+
     static string Wanted(RegistryValueRecord v, SettingsRestoreRequest r) =>
         v.MultiData != null ? string.Join("; ", v.MultiData.Select(m => Remap(m, r))) : Remap(v.Data, r);
 
@@ -102,6 +116,12 @@ public sealed class SettingsRestoreEngine
                     a.Blocked = changes == 0;
                     break;
                 }
+                case SettingKinds.LanguageList when SameLanguages(i):
+                    a.Description = "Already the same on this computer"; a.Blocked = true; break;
+                case SettingKinds.TimeZone when string.Equals(reader.Value("HKLM", @"SYSTEM\CurrentControlSet\Control\TimeZoneInformation", "TimeZoneKeyName", RegView.Reg64)?.AsString()?.Trim(), i.Parameter, StringComparison.OrdinalIgnoreCase):
+                    a.Description = "Already the same on this computer"; a.Blocked = true; break;
+                case SettingKinds.SystemLocale when string.Equals(CurrentSystemLocale(), i.Parameter, StringComparison.OrdinalIgnoreCase):
+                    a.Description = "Already the same on this computer"; a.Blocked = true; break;
                 case SettingKinds.LanguageList:
                 {
                     var missing = (i.Languages ?? new()).SelectMany(l => l.InputTips).Where(t => !KeyboardLayoutInstalled(t.Split(':')[1])).ToList();
