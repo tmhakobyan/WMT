@@ -114,13 +114,38 @@ public static class KlcExporter
         rows = rows.GroupBy(r => r.Sc).Select(g => g.First()).OrderBy(r => r.Sc).ToList();
         if (rows.Count == 0) warnings.Add("No typing keys were found in the layout tables.");
 
+        // ---- dead-key table (parsed first: a dead key MSKLC cannot describe is written as a plain character)
+        int deadCount = 0, chained = 0;
+        var groups = new List<(int Accent, List<string> Lines)>();
+        for (int i = 0; pDead != IntPtr.Zero; i++)
+        {
+            var e = pDead + i * 8;
+            uint both = (uint)Marshal.ReadInt32(e, 0);
+            if (both == 0) break;
+            int accent = (int)(both >> 16), baseCh = (int)(both & 0xFFFF);
+            int composed = (ushort)Marshal.ReadInt16(e, 4), dkf = (ushort)Marshal.ReadInt16(e, 6);
+            var g = groups.FirstOrDefault(x => x.Accent == accent);
+            if (g.Lines == null) { g = (accent, new List<string>()); groups.Add(g); }
+            g.Lines.Add($"{Hex(baseCh)}\t{Hex(composed)}");
+            if ((dkf & 1) != 0) chained++;
+            deadCount++;
+        }
+        var deadAccents = groups.Select(x => x.Accent).ToHashSet();
+        var orphanDead = new SortedSet<int>();
+
         string Cell(ushort[] chars, ushort[]? dead, int col)
         {
             if (col >= chars.Length) return "-1";
             var c = chars[col];
             if (c == WCH_NONE) return "-1";
             if (c == WCH_LGTR) return "%%";
-            if (c == WCH_DEAD) return dead != null && col < dead.Length ? Hex(dead[col]) + "@" : "-1";
+            if (c == WCH_DEAD)
+            {
+                if (dead == null || col >= dead.Length) return "-1";
+                if (deadAccents.Contains(dead[col])) return Hex(dead[col]) + "@";
+                orphanDead.Add(dead[col]);
+                return Hex(dead[col]);
+            }
             return Hex(c);
         }
 
@@ -190,24 +215,9 @@ public static class KlcExporter
             }
         }
 
-        // ---- dead keys
-        int deadCount = 0, chained = 0;
-        if (pDead != IntPtr.Zero)
+        // ---- dead keys (written after LIGATURE)
+        if (groups.Count > 0)
         {
-            var groups = new List<(int Accent, List<string> Lines)>();
-            for (int i = 0; ; i++)
-            {
-                var e = pDead + i * 8;
-                uint both = (uint)Marshal.ReadInt32(e, 0);
-                if (both == 0) break;
-                int accent = (int)(both >> 16), baseCh = (int)(both & 0xFFFF);
-                int composed = (ushort)Marshal.ReadInt16(e, 4), dkf = (ushort)Marshal.ReadInt16(e, 6);
-                var g = groups.FirstOrDefault(x => x.Accent == accent);
-                if (g.Lines == null) { g = (accent, new List<string>()); groups.Add(g); }
-                g.Lines.Add($"{Hex(baseCh)}\t{Hex(composed)}");
-                if ((dkf & 1) != 0) chained++;
-                deadCount++;
-            }
             if (chained > 0) warnings.Add($"{chained} chained dead-key entries were written as plain characters (MSKLC 1.4 cannot express chained dead keys).");
             foreach (var g in groups)
             {
@@ -216,6 +226,7 @@ public static class KlcExporter
                 L();
             }
         }
+        if (orphanDead.Count > 0) warnings.Add($"Dead keys without any combinations were written as plain characters: {string.Join(", ", orphanDead.Select(Hex))}.");
 
         void Names(string title, IntPtr list)
         {
