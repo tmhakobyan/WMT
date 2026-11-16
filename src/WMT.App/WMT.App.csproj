@@ -1,0 +1,15 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <OutputType>WinExe</OutputType>
+    <TargetFramework>net8.0-windows</TargetFramework>
+    <UseWPF>true</UseWPF>
+    <AssemblyName>WMT</AssemblyName>
+    <RootNamespace>WMT.App</RootNamespace>
+    <ApplicationManifest>app.manifest</ApplicationManifest>
+    <SatelliteResourceLanguages>en</SatelliteResourceLanguages>
+  </PropertyGroup>
+  <ItemGroup>
+    <ProjectReference Include="..\WMT.Core\WMT.Core.csproj" />
+    <EmbeddedResource Include="..\..\docs\Help.txt" LogicalName="Help.txt" />
+  </ItemGroup>
+</Project>

@@ -1,0 +1,197 @@
+WORKSTATION MIGRATION TOOLKIT 4.0 — ՕԳՆՈՒԹՅՈՒՆ (Help)
+=========================================================
+
+ԻՆՉ Է ԱՆՈՒՄ ԾՐԱԳԻՐԸ
+Ծրագիրը օգնում է Windows 10-ից Windows 11-ի մաքուր տեղադրման ժամանակ պահպանել և վերականգնել
+ձեր աշխատանքային միջավայրը՝ ընտրված ծրագրերի անհատական կարգավորումները (Word-ի ձևանմուշներ,
+մակրոսներ, բառարաններ, հավելումներ), Python/OCR նախագծերը և մոդելները, օգտատիրական պանակները,
+ինչպես նաև վերատեղադրման համար անհրաժեշտ ամբողջ տեղեկությունը։
+
+ՀԻՄՆԱԿԱՆ ԿԱՆՈՆՆԵՐ
+• Ծրագիրը ինքնաբերաբար ոչինչ չի սկանավորում. ամեն քայլ սկսվում է ձեր սեղմումով։
+• Սկանավորումը, Backup-ը և Verify-ը աղբյուր ֆայլերը միայն կարդում են. ոչինչ չեն փոխում և չեն ջնջում։
+• Ծրագրերի տեղադրման ֆայլերը, Windows/Office-ի DLL-ները, cache-երը, Python-ի .venv/site-packages-ը
+  լռելյայն ՉԵՆ պատճենվում. դրանց փոխարեն պահվում է վերատեղադրման տեղեկությունը։
+• Պատճենված ֆայլերը պահվում են իրենց իրական անուններով և պանակներով. դրանք կարելի է բացել
+  Windows Explorer-ով նույնիսկ առանց այս ծրագրի։
+• Գաղտնաբառեր, token-ներ, լիցենզիոն բանալիներ և Office-ի ակտիվացում չեն արտահանվում։
+• «Copied» ≠ «Verified» ≠ «Restored» ≠ «FunctionallyValidated». սրանք տարբեր վիճակներ են։
+• Նույն ֆիզիկական սկավառակի այլ բաժինը (օրինակ՝ G:) անկախ պահուստ ՉԷ։ Windows 10-ը ջնջելուց առաջ
+  պատճենեք փաթեթը այլ սարքի վրա (արտաքին սկավառակ, այլ համակարգիչ)։
+
+ԱՇԽԱՏԱՆՔԻ ՀԵՐԹԱԿԱՆՈՒԹՅՈՒՆԸ
+ 1. Software ներդիր → Discover software → ընտրեք ձեզ անհրաժեշտ ծրագրերը (օր.՝ Microsoft Office, Python, Tesseract)։
+ 2. User Profiles ներդիր → Discover profiles → ընտրեք պրոֆիլ(ներ)ը, ըստ ցանկության՝ օգտատիրական պանակներ
+    և Custom folders (any drive)։
+ 3. Migration Plan ներդիր → Generate targeted plan → դիտեք և ճշգրտեք ընտրությունը։
+ 4. Backup & Recovery → 1. Backup → ընտրեք արդեն գոյություն ունեցող նպատակային պանակ → Preview / Dry run →
+    Create backup։
+ 5. 2. Verify and Test Restore → Verify backup → Test restore (sandbox)։
+ 6. 3. Readiness → հետևեք, որ բոլոր տողերը դառնան Ready։ Միայն դրանից հետո կարելի է ջնջել Windows 10-ը։
+ 7. Նոր Windows 11-ում՝ տեղադրեք ծրագրերը, բացեք այս ծրագիրը, Open package → 4. Restore։
+
+ՄԵՆՅՈՒ
+Help — այս օգնությունը։
+Open log — բացում է աշխատանքային լոգը Notepad-ում (%LOCALAPPDATA%\WMT\Logs\wmt-ՏՏՏՏԱԱՕՕ.log)։
+Open log folder — բացում է լոգերի պանակը։
+About — տարբերակ, build և լոգի ուղի։
+
+========================================
+ՆԵՐԴԻՐ Software
+========================================
+Discover software — կարդում է տեղադրված ծրագրերի ցանկը Windows Registry-ից (64-bit, 32-bit, ընթացիկ
+  օգտատիրոջ և մյուս մուտք գործած օգտատերերի գրառումներ) և հայտնի portable պանակներից։ Աշխատում է ֆոնում։
+  Նոր սկանից հետո նախկին ընտրությունը պահպանվում է։ Ցանկում բացակայելը չի նշանակում, որ ծրագիրը չկա։
+Also query winget — լրացուցիչ աղբյուր. winget-ի ցանկը պահվում է փաթեթում (winget import-ի համար)։ Միակ աղբյուր չէ։
+Search — որոնում ըստ անվան, հրատարակչի, տարբերակի կամ տեղադրման ուղու։
+Filter — ցույց է տալիս միայն ընտրված տեսակը (Application, Office, Python, OCR, Runtime, Development, Portable)։
+Group by — խմբավորում ըստ Publisher, Category կամ Recovery method։
+Select all — ընտրում է ՄԻԱՅՆ ներկայումս երևացող տողերը։
+Clear — հանում է ընտրությունը երևացող տողերից։
+Invert — շրջում է երևացող տողերի ընտրությունը։
+Export list — պահում է ցանկը CSV և JSON ձևաչափերով։
+Սյունակներ.
+  Selected — ընտրված է միգրացիայի համար։   Name — անուն։   Publisher — հրատարակիչ (Unknown, եթե հայտնի չէ)։
+  Version — տարբերակ։   Build — build (Unknown, եթե հուսալիորեն հայտնի չէ)։   Architecture — x64/x86/Unknown։
+  Installation Type — MSI, Installer (EXE), Per-user, Click-to-Run, Portable։
+  Install Location — տեղադրման պանակ։   Detected Source — որտեղից է գտնվել։   Type — ծրագրի տեսակը։
+  Recovery Method — ինչպես վերականգնել (օր.՝ runtime-ը վերատեղադրվում է, DLL-ները չեն պատճենվում)։
+  Dependency Status — կախվածությունների ամփոփում (հաշվարկվում է պլանից հետո)։
+Office details — ներքևի շրջանակ։ Show Office details կոճակը ցույց է տալիս Office-ի product/edition, release,
+  տարբերակ, build, x86/x64, տեղադրման ձև և լեզվային/proofing բաղադրիչներ։ Համեմատման կանոններ՝
+  ճարտարապետության անհամապատասխանությունը արգելափակում է ռիսկային քայլերը, այլ release-ը զգուշացում է,
+  նույն release-ի այլ build-ը ինքնին անհամատեղելիություն չէ։
+
+========================================
+ՆԵՐԴԻՐ User Profiles
+========================================
+Discover profiles — ցույց է տալիս Windows-ի իրական օգտատերերին (համակարգային պրոֆիլները թաքցված են)։
+  Ոչ մի պրոֆիլ ինքնաբերաբար չի ընտրվում։
+Select all / Clear / Invert — խմբային ընտրություն։   Select current user — ընտրում է միայն ձեզ։
+Սյունակներ. Selected, Account (հաշիվ), SID, Profile path (պրոֆիլի պանակ), Loaded (registry-ն բեռնված է),
+  Accessible (Accessible / Inaccessible / Missing), Last used (NTUSER.DAT-ի վերջին փոփոխություն կամ unknown),
+  Note (օր.՝ պետք է administrator իրավունք)։ Ծրագիրը երբեք չի շրջանցում թույլտվությունները։
+User data folders of the selected profiles (opt-in; scanned only when you generate the plan) —
+  Desktop, Documents, Downloads, Pictures, Videos, Music, Favorites։ Լռելյայն ոչ մեկը նշված չէ։
+  Մեծ պանակները սկանավորվում են միայն պլան ստեղծելիս։
+Custom folders (any drive) — ձեր սեփական պանակները ցանկացած սկավառակից։ Add folder — ավելացնել,
+  Remove folder — հեռացնել։ Իրար մեջ ներդրված պանակները ավտոմատ միավորվում են, կրկնապատճենում չկա։
+Options —
+  Windows settings (fonts, environment, PATH, default apps) — օգտատիրոջ տառատեսակներ, ոչ գաղտնի
+    միջավայրային փոփոխականներ, PATH-ի լրացումներ, ֆայլերի ասոցիացիաներ (վերջինները՝ ձեռքով վերականգնման համար)։
+  Runtimes (reinstall list) — Visual C++/.NET/և այլն՝ որպես վերատեղադրման ցուցակ (ոչ թե DLL-ների պատճեն)։
+  Empty folders — դատարկ պանակների ռեժիմ. լռելյայն բացառվում են, կարելի է պահել ծրագրային կարգավորումների
+    ներսում կամ բոլորը։ Անհասանելի պանակը երբեք «դատարկ» չի համարվում։
+
+========================================
+ՆԵՐԴԻՐ Migration Plan
+========================================
+Generate targeted plan — ընտրված ծրագրերի և պրոֆիլների համար սկանավորում է ՄԻԱՅՆ հայտնի կամ
+  հայտնաբերված տեղակայումները (Word-ի Templates, STARTUP, UProof, AutoCorrect, Ribbon/QAT, trusted
+  locations, Python նախագծեր և մոդելներ, Tesseract tessdata և այլն) և ձեր ընտրած պանակները։
+  Office-ի *_Rules, cache, telemetry պանակները լռելյայն չեն մտնում։ Մակրոսները չեն գործարկվում.
+  VBA-ն վերլուծվում է ստատիկ (references, Declare, CreateObject, ֆայլային ուղիներ, ActiveX)։
+Select all Recommended — ընտրում է բոլոր Recommended ֆայլերը։   Clear selection — հանում է ամբողջ ընտրությունը։
+Ձախ մասում՝ կատեգորիաների և պանակների ծառ։ Վանդակը ունի երեք վիճակ (ընտրված / չընտրված / մասնակի)։
+  Ծնողի ընտրությունը ազդում է բոլոր ենթատարրերի վրա, նույնիսկ եթե դրանք դեռ չեք բացել։
+  Թվերը ցույց են տալիս ընտրված/թույլատրելի ֆայլերը և ծավալը։ INACCESSIBLE նշանակում է՝ պանակը չի կարդացվել։
+Մեջտեղում՝ Explorer-ի նման ցուցակ.
+  Up — մեկ մակարդակ վերև։   Search — որոնում այս պանակում և ենթապանակներում։
+  View — Details, Small Icons, Large Icons, Extra Large Icons (պատկերների իրական thumbnails)։
+  Sort — Name, Type, Size, Date; Descending — հակառակ կարգ։
+  Previous page / Next page — էջավորում մեծ պանակների համար։
+  Պանակի վրա կրկնակի սեղմումը բացում է այն։
+  Սյունակներ՝ Name, Type, Size, Modified, Class, Note։
+Աջ մասում.
+  Details — ընտրված տարրի աղբյուր, դաս, վերականգնման մեթոդ, նպատակային կանոն։
+  Dependencies — Component, Depends on, Type, Confidence (Confirmed / Inferred / Unknown), Required action։
+  Recovery steps — Item, Method, Class, Destination, Verification։
+Դասակարգում (Class).
+  Recommended — պահել (լռելյայն ընտրված)։   Review — որոշում եք դուք։
+  InstallerManaged — պահվում է տեղադրման տեղեկությունը, ֆայլը չի պատճենվում։
+  Unsupported — ավտոմատ վերականգնում հնարավոր չէ, տրվում են ձեռքով քայլեր։
+Ներքևում՝ խնդիրների ցուցակ. Severity, Area, Message, Path, Action։
+
+========================================
+ՆԵՐԴԻՐ Backup & Recovery
+========================================
+--- 1. Backup ---
+Destination — արդեն գոյություն ունեցող պանակ (օր.՝ G:\Backup)։ Browse destination — ընտրել։
+  Ծրագիրը ստեղծում է միայն մեկ ենթապանակ՝ Migration-<համակարգիչ>-<UTC ժամ>-<id> և ամեն ինչ դնում է դրա մեջ։
+  Ծնող պանակները չեն ստեղծվում և չեն փոխվում։ Պանակը չի կարող լինել աղբյուր պանակների ներսում։
+Preview / Dry run — ցույց է տալիս ֆայլերի քանակը, ծավալը, կատեգորիաները (Category, Files, Size, Classes,
+  Destination rule), նախազգուշացումները և ֆիզիկական սկավառակի ստուգումը։ Ոչինչ չի գրում։
+Create backup — պատճենում է ժամանակավոր .partial ֆայլի մեջ, համեմատում SHA-256-ը, հետո միայն վերջնականացնում։
+  Սխալի դեպքում՝ սահմանափակ կրկնափորձ։ Չպատճենված ֆայլի դեպքում փաթեթը Incomplete է։
+Retry failed files — կրկին փորձում է ՄԻԱՅՆ ձախողված ֆայլերը. հաջող պատճենները չեն վերագրվում։
+
+--- 2. Verify and Test Restore ---
+Open package — բացել առկա փաթեթ (օրինակ՝ նոր Windows-ում)։
+Verify backup — միայն կարդալու ստուգում. վերահաշվում է բոլոր ֆայլերի SHA-256-ը և չափը, ստուգում է
+  մանիֆեստները, բացակայող, ավելորդ, կրկնվող և վտանգավոր (..) ուղիները։ Ոչինչ չի ուղղում և չի վերագրում։
+  SHA-256-ը ամբողջականության ստուգիչ է, ոչ թե թվային ստորագրություն։
+Browse test folder — ընտրել ԴԱՏԱՐԿ փորձնական պանակ։
+Test restore (sandbox) — վերականգնում է ֆայլերը միայն փորձնական պանակում և ստուգում բայթ առ բայթ։
+  Իրական Windows/Office պանակներին չի դիպչում։
+Open recovery plan — վերականգնման հերթականացված պլան (HTML)։   Open Python plan — PYTHON-RECOVERY-PLAN.txt։
+Open backup report — հաջողված/ձախողված/բաց թողնված/ձեռքով քայլերի հաշվետվություն։
+Open package folder — բացում է փաթեթի պանակը Explorer-ով։
+
+--- 3. Readiness ---
+Refresh readiness — թարմացնում է պատրաստվածության գնահատումը։
+Export readiness report — պահում է հաշվետվությունը փաթեթի Status պանակում և բացում այն։
+Սյունակներ՝ State (Ready / NeedsReview / Blocked / NotTested), Area, Item, Reason, Action, Confirmed։
+  «Migration Ready» երևում է միայն, երբ բոլոր տողերը Ready են։ Արգելափակում են՝ չստուգված պահուստը,
+  ձախողված կամ չկատարված Test restore-ը, ձախողված Python կախվածությունները, բացակայող installer-ը,
+  Office հավելման անհամատեղելիությունը և անկախ պահուստի բացակայությունը։
+  Confirmed վանդակը թույլատրված է միայն այն տողերի համար, որոնք կարող եք հաստատել դուք
+  (օր.՝ «ունեմ Office-ի տեղադրման միջոցը», «պատճենել եմ փաթեթը այլ սարքի վրա»)։
+
+--- 4. Restore --- (կատարվում է նոր Windows-ում)
+Source account / Source profile path / Files — հին պրոֆիլները։
+Target profile on this computer — ընտրեք, թե որ նոր պրոֆիլին է համապատասխանում հինը։ Ավտոմատ չի լրացվում.
+  հին SID-ը կամ C:\Users\... ուղին չի պարտադրվում։
+Drive mapping — օր.՝ D:=E:, եթե սկավառակի տառը փոխվել է։
+Allow overwrite (previous file is saved) — լռելյայն անջատված է. միացնելու դեպքում հին ֆայլը պահվում է Undo-ի համար։
+Check prerequisites — ստուգում է՝ Verify-ը անցե՞լ է, պրոֆիլները համապատասխանեցվա՞ծ են, Office-ի և
+  runtime-ների համատեղելիությունը, Python-ի պահանջվող տարբերակները։
+Dry run — ցույց է տալիս բոլոր փոփոխությունները (Files (dry run) և Registry (review) ներդիրներ)։ Ոչինչ չի փոխում։
+Restore selected — վերականգնում է միայն նշվածները՝ հաստատումից հետո։ Գրվում է journal։
+Undo last restore — հետ է բերում վերջին վերականգնումը (ձեր հետագայում փոխած ֆայլերը չի ջնջում)։
+Ներդիրներ.
+  Prerequisites — Severity, Area, Message, Action։
+  Files (dry run) — Restore (վանդակ), Action, Target, Category, Reason։
+  Registry (review) — Apply (լռելյայն անջատված), Key (HKCU), Value, Type, Current (old), From backup (new),
+    Blocked, Warning։ Կիրառվում է միայն ընթացիկ մուտք գործած օգտատիրոջ համար, հին արժեքը պահվում է։
+  Python environments — Environment, Python, Arch, Capture, Packages։ Recreate selected environment —
+    ցույց է տալիս ճշգրիտ հրամանները, հարցնում է հաստատում, ստեղծում է venv և տեղադրում փաթեթները
+    պաշտոնական PyPI-ից։ Եթե փաթեթների ցուցակը Partial/Failed է, արդյունքը լիարժեք չի լինի։
+Functional test checklist (file restore is not the same as a working program) — ծրագրերի աշխատանքի ստուգաթերթ.
+  Save functional test results — պահում է արդյունքը։ Միայն ֆայլերի վերականգնումը չի նշանակում, որ ծրագիրը աշխատում է։
+
+========================================
+ՍՏԱՏՈՒՍ ԲԱՐ
+========================================
+Գործողության անվանումը, փուլը, մշակված քանակը (և ընդհանուրը, եթե հայտնի է), առաջընթաց (հայտնի
+ընդհանուրի դեպքում՝ տոկոսով, անհայտի դեպքում՝ շարժվող), վերջին ակտիվությունից անցած ժամանակը։
+Եթե 60 վայրկյան նոր առաջընթաց չկա, երևում է «No recent progress — investigate». դա ՉԻ նշանակում,
+որ ծրագիրը կախվել է։
+Cancel — անվտանգ դադարեցնում է ընթացիկ գործողությունը (ավարտված ֆայլերը մնում են, փաթեթը նշվում է Incomplete)։
+Բոլոր բաժանարարները (ցուցակների, լոգի միջև) կարելի է քաշել մկնիկով։
+
+ԳՈՐԾԱՐԿՈՒՄ
+Launch-WMT.cmd կամ WMT.exe — սովորական գործարկում (կրկնակի սեղմում)։
+Launch-WMT-Diagnostics.cmd — գործարկում + լոգի բացում ախտորոշման համար։
+wmt-cli.exe — նույն գործողությունները առանց GUI-ի (software, profiles, office, plan, backup, verify,
+  test-restore, readiness)։
+
+ՓԱԹԵԹԻ ԿԱՌՈՒՑՎԱԾՔ
+Data\<սկավառակ>\<սկզբնական ուղի> — ձեր ֆայլերը։   Manifests\ — JSON մանիֆեստներ (UTF-8, SchemaVersion)։
+Reports\ — Recovery-Plan, Readiness, Backup-Report, PYTHON-RECOVERY-PLAN.txt և այլն։
+Logs\activity.log — պահուստավորման լոգ։   Status\ — Verify/Test Restore/Restore արդյունքներ։
+README.html / README.txt — ինչպես օգտագործել փաթեթը առանց ծրագրի։
+
+ՍԱՀՄԱՆԱՓԱԿՈՒՄՆԵՐ
+Տե՛ս KNOWN-ISSUES.md։ Ծրագիրը չի կարող երաշխավորել երրորդ կողմի ծրագրերի բոլոր անհայտ
+կախվածությունների կամ լիցենզավորման ավտոմատ վերականգնումը. դրանք ցույց են տրվում որպես
+Unknown կամ ձեռքով քայլեր։
