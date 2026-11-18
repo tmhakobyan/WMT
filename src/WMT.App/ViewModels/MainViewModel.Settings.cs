@@ -21,6 +21,7 @@ public sealed class SettingActionRow : ObservableObject
     public SettingActionRow(SettingAction a) { Action = a; }
     public SettingAction Action { get; }
     public bool Selected { get => Action.Selected; set { if (!Action.Blocked && Action.Selected != value) { Action.Selected = value; Raise(); } } }
+    public bool CanApply => !Action.Blocked;
     public string AdminText => Action.RequiresAdmin ? "Yes" : "";
     public string SignOutText => Action.RequiresSignOut ? "Yes" : "";
 }
@@ -55,7 +56,7 @@ public sealed partial class MainViewModel
             foreach (var r in SettingsView.Cast<SettingRow>()) r.IsSelected = (p as string) == "recommended" ? r.Item.Classification == Classification.Recommended : false;
         }, _ => IsIdle && settingRows.Count > 0);
         SettingsDryRunCommand = new RelayCommand(SettingsDryRun, () => IsIdle && loadedPackage?.WindowsSettings != null);
-        ApplySettingsCommand = new RelayCommand(async () => await ApplySettingsAsync(), () => IsIdle && SettingActionRows.Any(a => a.Selected));
+        ApplySettingsCommand = new RelayCommand(async () => await ApplySettingsAsync(null), () => IsIdle && SettingActionRows.Any(a => a.Selected));
         UndoSettingsCommand = new RelayCommand(UndoSettings, () => IsIdle && lastSettingsJournal != null && !lastSettingsJournal.UndoDone);
     }
 
@@ -103,10 +104,13 @@ public sealed partial class MainViewModel
         SettingsRestoreStatus = $"Dry run: {SettingActionRows.Count(a => a.Selected)} change(s) proposed, {SettingActionRows.Count(a => a.Action.Blocked)} not needed or manual. Nothing was changed.";
     }
 
-    async Task ApplySettingsAsync()
+    /// <summary>Applies the ticked settings, or only the given ones (right-click → Apply only this).</summary>
+    async Task ApplySettingsAsync(List<SettingAction>? only = null)
     {
         if (loadedPackage == null) return;
-        var sel = SettingActionRows.Where(a => a.Selected).Select(a => a.Action).ToList();
+        var sel = only ?? SettingActionRows.Where(a => a.Selected).Select(a => a.Action).ToList();
+        if (sel.Count == 0) { Inform("Nothing is ticked. Tick settings in the list (or 'Select all'), or right-click one → Apply only this item."); return; }
+        var keptOff = SettingActionRows.Where(a => !a.Selected && !a.Action.Blocked).Select(a => a.Action.ItemId + "|" + a.Action.Name).ToHashSet();
         int admin = sel.Count(a => a.RequiresAdmin);
         if (!Confirm($"Apply {sel.Count} setting(s) for the signed-in user?\n\n" + string.Join("\n", sel.Take(25).Select(a => "• " + a.Name + ": " + a.Description)) + (sel.Count > 25 ? "\n…" : "") +
                      (admin > 0 ? $"\n\n{admin} of them need administrator permission (Windows will ask)." : "") + "\n\nOld registry values are saved; you can Undo.")) return;
@@ -116,8 +120,11 @@ public sealed partial class MainViewModel
         if (j == null) return;
         lastSettingsJournal = j;
         lastSettingsJournalPath = Path.Combine(loadedPackage.Layout.Status, "Settings-" + j.JournalId, "journal.json");
-        SettingsRestoreStatus = $"Applied {j.Restored}, failed {j.Failed}." + (j.Errors.Count > 0 ? " " + string.Join(" | ", j.Errors.Take(5)) : "") + " Sign out and in to see every change.";
+        var status = $"Applied {j.Restored}, failed {j.Failed}." + (j.Errors.Count > 0 ? " " + string.Join(" | ", j.Errors.Take(5)) : "") + " Sign out and in to see every change.";
         SettingsDryRun();
+        // Keep the user's unticks after the list is recalculated (applied settings now show "Already the same").
+        foreach (var a in SettingActionRows) if (keptOff.Contains(a.Action.ItemId + "|" + a.Action.Name)) a.Selected = false;
+        SettingsRestoreStatus = status;
     }
 
     void UndoSettings()

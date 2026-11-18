@@ -115,6 +115,7 @@ Restore from package (նոր Windows-ում, փաթեթը բացելուց հե�
     ֆայլը կամ գրանցումը երբեք չի վերագրվում։ Տեղադրելուց հետո գուցե պետք լինի դուրս գալ ու նորից մուտք գործել (sign out)։
   Restore language list and keyboard order — վերականգնում է լեզուների ցանկն ու դասավորությունների հերթականությունը։
     Սեղմեք այն միայն դասավորությունները տեղադրելուց հետո (չտեղադրվածները բաց են թողնվում)։
+  Select all / Clear — նշում/հանում է բոլոր տեղադրվող դասավորությունները։ Աջ սեղմում → Install only this item։
   Սյունակներ՝ Install, Layout, KLID, What will happen։
 
 ========================================
@@ -142,6 +143,7 @@ Restore from package (նոր Windows-ում).
     Administrator պահանջող քայլերի համար Windows-ը ինքը կհարցնի թույլտվություն։
   Undo last settings restore — վերադարձնում է registry-ի արժեքներն ու պատճենված ֆայլերը. հրամաններով արվածների
     (Wi-Fi, տպիչ, task) համար ցույց է տալիս, թե ինչպես հետ բերել ձեռքով։
+  Select all / Clear — նշում/հանում է բոլոր կիրառելի կարգավորումները։ Աջ սեղմում → Apply only this item։
   Սյունակներ՝ Apply, Group, Setting, What will happen, Administrator, Sign-out։
 Ինչը չի վերականգնվում ավտոմատ. Default apps (Windows-ը պաշտպանում է), տեղական տպիչների դրայվերներ,
 Start/taskbar-ի ամրացված պատկերակներ (Windows 10-ից 11 չեն փոխանցվում)։
@@ -211,19 +213,39 @@ Export readiness report — պահում է հաշվետվությունը փա�
   (օր.՝ «ունեմ Office-ի տեղադրման միջոցը», «պատճենել եմ փաթեթը այլ սարքի վրա»)։
 
 --- 4. Restore --- (կատարվում է նոր Windows-ում)
-Source account / Source profile path / Files — հին պրոֆիլները։
-Target profile on this computer — ընտրեք, թե որ նոր պրոֆիլին է համապատասխանում հինը։ Ավտոմատ չի լրացվում.
-  հին SID-ը կամ C:\Users\... ուղին չի պարտադրվում։
-Drive mapping — օր.՝ D:=E:, եթե սկավառակի տառը փոխվել է։
-Allow overwrite (previous file is saved) — լռելյայն անջատված է. միացնելու դեպքում հին ֆայլը պահվում է Undo-ի համար։
-Check prerequisites — ստուգում է՝ Verify-ը անցե՞լ է, պրոֆիլները համապատասխանեցվա՞ծ են, Office-ի և
-  runtime-ների համատեղելիությունը, Python-ի պահանջվող տարբերակները։
-Dry run — ցույց է տալիս բոլոր փոփոխությունները (Files (dry run) և Registry (review) ներդիրներ)։ Ոչինչ չի փոխում։
-Restore selected — վերականգնում է միայն նշվածները՝ հաստատումից հետո։ Գրվում է journal։
+Էջի վերևի կապույտ տողը ցույց է տալիս ամբողջ հերթականությունը նոր Windows-ում.
+  A. տեղադրեք ձեր ծրագրերը (Office, Python…) → B. Keyboard layouts → C. Windows settings → D. ֆայլեր (այս էջի
+  1–4 քայլերը) → E. Python environments։ B. Keyboard layouts և C. Windows settings կոճակները բացում են համապատասխան ներդիրը։
+Կապույտ թավ տողը («Next — …») միշտ գրում է, թե ՀԻՄԱ ինչ անել։ Հետևեք դրան։
+Step 1. Source account / Source profile path / Files — հին պրոֆիլները։ Target profile on this computer — ընտրեք,
+  թե որ նոր պրոֆիլին է համապատասխանում հինը (սովորաբար ձերը՝ C:\Users\ՁերԱնունը)։ Ավտոմատ չի լրացվում։
+Step 2. Dry run — ցույց է տալիս, թե ինչ կվերականգնվի (Files (dry run) և Registry (review) ցուցակներ)։ Ոչինչ չի փոխում։
+  Եթե պրոֆիլը փոխեք, Dry run-ը սեղմեք նորից։
+Step 3. Դիտեք ցուցակները. հանեք այն, ինչ պետք չէ։
+  Select all / Clear — ցուցակի բոլոր վանդակները նշում / հանում է (յուրաքանչյուր ցուցակում իր կոճակները կան)։
+  Վանդակը փոխվում է մեկ սեղմումով։ Մոխրագույն (անջատված) վանդակները չեն կարող նշվել (օր.՝ ֆայլն արդեն նույնն է)։
+  Աջ սեղմում տողի վրա (մկնիկի տակի տողը) — մենյու.
+    Restore only this item — վերականգնում է ՄԻԱՅՆ այդ տողը՝ անկախ մյուս վանդակներից։ Եթե այնտեղ արդեն կա
+      տարբեր ֆայլ, հարցնում է՝ փոխարինե՞լ (հին ֆայլը պահվում է Undo-ի համար)։
+    Tick highlighted rows / Untick highlighted rows — նշում/հանում է ընդգծված տողերը (Ctrl կամ Shift-ով կարող եք
+      ընդգծել մի քանի տող, ապա աջ սեղմել. այդ դեպքում մենյուն կգրի «… only these N items»)։
+    Select all / Clear all — նույնն է, ինչ վերևի կոճակները։
+  Նույն մենյուն կա Registry (review) ցուցակում (Apply only this item), Windows Settings ներդիրի վերականգնման
+  ցուցակում (Apply only this item) և Keyboard Layouts ներդիրի վերականգնման ցուցակում (Install only this item)։
+Step 4. Restore selected — վերականգնում է նշվածները՝ հաստատումից հետո։ Նախապայմանները (Check prerequisites)
+  ստուգվում են ավտոմատ։ Վերականգնվածները ցուցակում նշվում են «Already the same / Restored just now»։ Գրվում է journal։
 Undo last restore — հետ է բերում վերջին վերականգնումը (ձեր հետագայում փոխած ֆայլերը չի ջնջում)։
+Check prerequisites — ոչ պարտադիր. ստուգում է՝ Verify-ը անցե՞լ է, պրոֆիլները համապատասխանեցվա՞ծ են, Office-ի և
+  runtime-ների համատեղելիությունը, Python-ի պահանջվող տարբերակները։
+Options. Drive mapping — օր.՝ D:=E:, եթե սկավառակի տառը փոխվել է։
+  Allow overwrite (previous file is saved) — լռելյայն անջատված է. միացնելու դեպքում (և Dry run-ից հետո) արդեն
+  գոյություն ունեցող տարբեր ֆայլերը նույնպես կնշվեն որպես Replace. հին ֆայլը պահվում է Undo-ի համար։
+Files ցուցակի Action սյունակը. New file — նոր ֆայլ, Replace — փոխարինում, Already the same — արդեն նույնն է,
+  Exists (different) — կա տարբեր ֆայլ (աջ սեղմումով կարող եք փոխարինել), No target profile — Step 1-ը լրացված չէ,
+  Not possible — համակարգային/ծրագրի պանակ կամ գոյություն չունեցող սկավառակ (տես Reason)։
 Ներդիրներ.
   Prerequisites — Severity, Area, Message, Action։
-  Files (dry run) — Restore (վանդակ), Action, Target, Category, Reason։
+  Files (dry run) — Restore (վանդակ), Action, Target, Category, Reason։ Select all, Clear։
   Registry (review) — Apply (լռելյայն անջատված), Key (HKCU), Value, Type, Current (old), From backup (new),
     Blocked, Warning։ Կիրառվում է միայն ընթացիկ մուտք գործած օգտատիրոջ համար, հին արժեքը պահվում է։
   Python environments — Environment, Python, Arch, Capture, Packages։ Recreate selected environment —

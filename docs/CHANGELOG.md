@@ -1,5 +1,13 @@
 # Changelog
 
+## 4.2.0-beta — clearer restore, Select all / Clear, right-click "only this item"
+- Restore page reorganised into numbered steps (1. target profile, 2. Dry run, 3. review, 4. Restore selected) with a banner showing the whole order on the new Windows (programs → keyboard layouts → Windows settings → files → Python) and buttons that open the Keyboard Layouts / Windows Settings tabs.
+- A "Next — …" line always says what to do now (open package, choose profile, run Dry run again after a profile change, review and restore).
+- Select all / Clear buttons on every restore list (files, registry, Windows settings, keyboard layouts).
+- Right-click a row: "Restore / Apply / Install only this item" (or "only these N items" for highlighted rows), "Tick/Untick highlighted rows", "Select all", "Clear all". For a file that already exists with different content it offers to replace it (the current file is saved for Undo).
+- Check boxes in these lists toggle with one click; rows that cannot be restored have a disabled box; the Action column uses plain words (New file, Replace, Already the same, Exists (different), No target profile, Not possible).
+- "Restore selected" runs the prerequisite check automatically; restored rows are marked "Restored just now".
+
 ## 4.1.0-beta — keyboard layouts restore without manual MSKLC work
 - **.klc generation**: for every custom layout WMT reads the installed DLL's KBDTABLES (the same data MSKLC's "Load Existing Keyboard" reads) and writes an MSKLC source (.klc, UTF-16): shift states, characters, Caps Lock / SGCaps, dead keys (incl. chained), ligatures, key names. Saved inside every package (`Reports\Keyboard`) and on demand (**Save .klc files** → Documents\WMT Keyboard Layouts). **Open in MSKLC** opens it in Microsoft Keyboard Layout Creator, or offers Microsoft's download page.
 - **Install from the saved DLL**: on the new Windows, *Install selected layouts* copies the layout DLL to System32 (and SysWOW64) and registers the KLID exactly like an MSKLC setup package (one UAC prompt). Existing different files/registrations are never overwritten; Layout Id conflicts get a free id. Layout DLLs are now Recommended in the plan and a DLL in the package makes the layout "Ready".

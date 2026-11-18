@@ -6,7 +6,7 @@ on:
 permissions:
   contents: write
 env:
-  WMT_VERSION: 4.1.0-beta
+  WMT_VERSION: 4.2.0-beta
 jobs:
   build:
     runs-on: windows-latest
@@ -98,6 +98,6 @@ jobs:
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
-          foreach ($t in 'v3.0.0-m1', 'v4.0.0-beta', "v$env:WMT_VERSION") { gh release delete $t --yes --cleanup-tag 2>$null; $global:LASTEXITCODE = 0 }
+          foreach ($t in 'v3.0.0-m1', 'v4.0.0-beta', 'v4.1.0-beta', "v$env:WMT_VERSION") { gh release delete $t --yes --cleanup-tag 2>$null; $global:LASTEXITCODE = 0 }
           gh release create "v$env:WMT_VERSION" "release/WMT-$env:WMT_VERSION.zip" ci-evidence.zip --target "${{ github.sha }}" --title "Workstation Migration Toolkit $env:WMT_VERSION" --notes-file docs/RELEASE-NOTES.md
           if ($LASTEXITCODE -ne 0) { throw 'release failed' }

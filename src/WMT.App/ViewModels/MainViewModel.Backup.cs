@@ -22,8 +22,6 @@ public sealed partial class MainViewModel
     public ObservableCollection<ReadinessRow> ReadinessRows { get; } = new();
     public ObservableCollection<ProfileMapRow> ProfileMapRows { get; } = new();
     public ObservableCollection<Issue> PrerequisiteIssues { get; } = new();
-    public ObservableCollection<RestoreOp> RestoreFileOps { get; } = new();
-    public ObservableCollection<RegistryOp> RestoreRegistryOps { get; } = new();
     public ObservableCollection<PythonEnvironmentInfo> PackagePythonEnvs { get; } = new();
     public ObservableCollection<CheckRow> FunctionalChecks { get; } = new();
     public PythonEnvironmentInfo? SelectedPythonEnv { get; set; }
@@ -166,14 +164,20 @@ public sealed partial class MainViewModel
             if (choices.Count == 0) { var me = Environment.GetFolderPath(Environment.SpecialFolder.UserProfile); if (!string.IsNullOrEmpty(me)) choices.Add(me); }
             choices.Insert(0, "");
             foreach (var p in loadedPackage.Profiles)
-                ProfileMapRows.Add(new ProfileMapRow { Source = p, FileCount = loadedPackage.Files.Count(f => f.Selected && f.ProfileSid == p.Sid), Choices = choices, Target = null });
+            {
+                var row = new ProfileMapRow { Source = p, FileCount = loadedPackage.Files.Count(f => f.Selected && f.ProfileSid == p.Sid), Choices = choices, Target = null };
+                row.PropertyChanged += (_, _) => OnProfileTargetChanged();
+                ProfileMapRows.Add(row);
+            }
             PackagePythonEnvs.Clear();
             foreach (var e in loadedPackage.Python?.Environments.Where(e => e.Kind != "Interpreter") ?? Enumerable.Empty<PythonEnvironmentInfo>()) PackagePythonEnvs.Add(e);
             FunctionalChecks.Clear();
             foreach (var f in loadedPackage.FunctionalTests) FunctionalChecks.Add(new CheckRow { Text = f });
-            restorePlan = null; RestoreFileOps.Clear(); RestoreRegistryOps.Clear(); PrerequisiteIssues.Clear();
+            restorePlan = null; RestoreFileRows.Clear(); RestoreRegistryRows.Clear(); PrerequisiteIssues.Clear();
+            planStale = justRestored = prereqChecked = false; lastJournal = null;
             SettingActionRows.Clear(); RefreshKeyboardRestore();
             Raise(nameof(HasPackage));
+            RaiseRestoreHint();
             RefreshReadiness();
         }
         catch (Exception ex) { Inform("Cannot open package: " + ex.Message); }
@@ -286,7 +290,8 @@ public sealed partial class MainViewModel
         });
         PrerequisiteIssues.Clear();
         foreach (var i in (list ?? new()).OrderByDescending(i => i.Severity)) PrerequisiteIssues.Add(i);
-        RestoreStatus = list == null ? "Check failed" : $"{list.Count(i => i.Severity == IssueSeverity.Blocker)} blocker(s), {list.Count(i => i.Severity == IssueSeverity.Warning)} warning(s).";
+        prereqChecked = list != null;
+        RestoreStatus = list == null ? "Check failed" : $"Prerequisites: {list.Count(i => i.Severity == IssueSeverity.Blocker)} blocker(s), {list.Count(i => i.Severity == IssueSeverity.Warning)} warning(s) — see the Prerequisites list below.";
     }
 
     async Task DryRunAsync()
@@ -296,35 +301,51 @@ public sealed partial class MainViewModel
         RestorePlan? rp = null;
         await RunJob("Restore dry run", _ => { rp = new RestoreEngine(Log, Registry, RegistryWriter).DryRun(pkg, req); return Task.CompletedTask; });
         restorePlan = rp;
-        RestoreFileOps.Clear(); RestoreRegistryOps.Clear();
+        RestoreFileRows.Clear(); RestoreRegistryRows.Clear();
+        planStale = justRestored = false;
+        RaiseRestoreHint();
         if (rp == null) return;
-        foreach (var o in rp.Files) RestoreFileOps.Add(o);
-        foreach (var o in rp.Registry) RestoreRegistryOps.Add(o);
+        foreach (var o in rp.Files) RestoreFileRows.Add(new RestoreFileRow(o));
+        foreach (var o in rp.Registry) RestoreRegistryRows.Add(new RegistryRow(o));
+        RaiseRestoreHint();
         var html = Path.Combine(pkg.Layout.Status, $"Restore-DryRun-{DateTime.UtcNow:yyyyMMdd'T'HHmmss'Z'}.html");
         Json.WriteText(html, ReportWriter.RestoreHtml(rp, null));
         RestoreStatus = $"Dry run: create {rp.Count(RestoreAction.Create)}, overwrite {rp.Count(RestoreAction.Overwrite)}, identical {rp.Count(RestoreAction.SkipIdentical)}, " +
                         $"existing kept {rp.Count(RestoreAction.SkipExisting)}, unmapped {rp.Count(RestoreAction.Unmapped)}, blocked {rp.Count(RestoreAction.Blocked)}; registry values available {rp.Registry.Count(r => !r.Blocked)} (none selected by default). Nothing was changed.";
     }
 
-    async Task RestoreAsync()
+    Task RestoreAsync() => restorePlan == null ? Task.CompletedTask : ExecuteRestoreAsync(restorePlan, RestoreFileRows.ToList(), RestoreRegistryRows.ToList());
+
+    /// <summary>Restores the ticked operations of a plan (the whole dry run, or the rows chosen with right-click).
+    /// Prerequisites are checked automatically first.</summary>
+    async Task<RestoreJournal?> ExecuteRestoreAsync(RestorePlan rp, List<RestoreFileRow> fileRows, List<RegistryRow> regRows)
     {
-        if (loadedPackage == null || restorePlan == null) return;
+        if (loadedPackage == null) return null;
+        int files = rp.Files.Count(f => f.Selected && f.Action is RestoreAction.Create or RestoreAction.Overwrite);
+        int over = rp.Files.Count(f => f.Selected && f.Action == RestoreAction.Overwrite);
+        int regs = rp.Registry.Count(r => r.Selected && !r.Blocked);
+        if (files + regs == 0) { Inform("Nothing is ticked to restore. Tick rows in the lists (or use 'Select all'), or right-click a row → Restore only this item."); return null; }
+        await CheckPrerequisitesAsync();
+        if (!prereqChecked) return null;
         var blockers = PrerequisiteIssues.Where(i => i.Severity == IssueSeverity.Blocker).ToList();
-        if (PrerequisiteIssues.Count == 0) { Inform("Run 'Check prerequisites' first."); return; }
-        if (blockers.Count > 0) { Inform("Restore is blocked:\n\n" + string.Join("\n", blockers.Select(b => "• " + b.Message))); return; }
-        int files = restorePlan.Files.Count(f => f.Selected && f.Action is RestoreAction.Create or RestoreAction.Overwrite);
-        int over = restorePlan.Files.Count(f => f.Selected && f.Action == RestoreAction.Overwrite);
-        int regs = restorePlan.Registry.Count(r => r.Selected && !r.Blocked);
-        if (files + regs == 0) { Inform("Nothing is selected to restore."); return; }
-        if (!Confirm($"Restore now?\n\n• {files} files ({over} overwrite — previous versions are saved for Undo)\n• {regs} registry values (HKCU of the signed-in user, previous values saved)\n\nA journal is written to the package Status folder; you can Undo.")) return;
-        if (regs > 0 && !Confirm($"Registry: {regs} value(s) will be changed in HKEY_CURRENT_USER. Continue?")) return;
-        RestoreJournal? j = null; var pkg = loadedPackage; var rp = restorePlan;
+        if (blockers.Count > 0) { Inform("Restore is blocked — fix these first (see the Prerequisites list):\n\n" + string.Join("\n", blockers.Select(b => "• " + b.Message + (string.IsNullOrEmpty(b.RequiredAction) ? "" : " → " + b.RequiredAction)))); return null; }
+        var what = files + regs == 1
+            ? "Restore this item?\n\n" + (files == 1 ? rp.Files.First(f => f.Selected).Target + (over == 1 ? "\n(replaces the current file — it is saved first for Undo)" : "") : "HKCU\\" + rp.Registry.First(r => r.Selected).KeyPath + "\\" + rp.Registry.First(r => r.Selected).ValueName)
+            : $"Restore now?\n\n• {files} file(s) ({over} replace an existing file — previous versions are saved for Undo)\n• {regs} registry value(s) (HKCU of the signed-in user, previous values saved)";
+        if (!Confirm(what + "\n\nA journal is written to the package Status folder; 'Undo last restore' can put everything back.")) return null;
+        if (regs > 1 && !Confirm($"Registry: {regs} value(s) will be changed in HKEY_CURRENT_USER. Continue?")) return null;
+        RestoreJournal? j = null; var pkg = loadedPackage;
         await RunJob("Restore", job => { j = new RestoreEngine(Log, Registry, RegistryWriter).Execute(pkg, rp, job.Progress, job.Token); if (j.Failed > 0) job.Warnings.Add($"{j.Failed} item(s) failed"); return Task.CompletedTask; });
-        if (j == null) return;
+        if (j == null) return null;
         lastJournal = j;
         lastJournalPath = Path.Combine(pkg.Layout.Status, "Restore-" + j.JournalId, "journal.json");
         Json.WriteText(Path.Combine(pkg.Layout.Status, "Restore-" + j.JournalId, "report.html"), ReportWriter.RestoreHtml(rp, j));
-        RestoreStatus = $"Restored {j.Restored} item(s), {j.Failed} failed. Files are restored; programs are NOT yet confirmed working — complete the functional checklist below.";
+        MarkRestored(j, fileRows.Where(f => rp.Files.Contains(f.Op) && f.Op.Selected), regRows.Where(r => rp.Registry.Contains(r.Op) && r.Op.Selected));
+        justRestored = true;
+        RestoreStatus = $"Restored {j.Restored} item(s), {j.Failed} failed." + (j.Errors.Count > 0 ? " " + string.Join(" | ", j.Errors.Take(3)) : "") +
+                        " Files are back; please check that your programs open them (checklist at the bottom).";
+        RaiseRestoreHint();
+        return j;
     }
 
     void UndoRestore()
@@ -332,7 +353,8 @@ public sealed partial class MainViewModel
         if (lastJournal == null || lastJournalPath == null) return;
         if (!Confirm("Undo the last restore? Restored files that you changed afterwards are kept.")) return;
         var problems = new RestoreEngine(Log, Registry, RegistryWriter).Undo(lastJournal, lastJournalPath);
-        RestoreStatus = problems.Count == 0 ? "Last restore undone." : "Undo finished with problems:\n" + string.Join("\n", problems.Take(10));
+        RestoreStatus = problems.Count == 0 ? "Last restore undone. Press 'Dry run' to see the current state." : "Undo finished with problems:\n" + string.Join("\n", problems.Take(10));
+        justRestored = false; RaiseRestoreHint();
     }
 
     async Task RecreatePythonAsync()

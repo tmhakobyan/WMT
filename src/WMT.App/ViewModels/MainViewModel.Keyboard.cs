@@ -21,7 +21,8 @@ public sealed class KeyboardRestoreRow : ObservableObject
 {
     bool selected; string action = "";
     public required KeyboardLayoutInfo Info { get; init; }
-    public bool Selected { get => selected; set => Set(ref selected, value); }
+    public bool CanInstall { get; set; }
+    public bool Selected { get => selected; set => Set(ref selected, value && CanInstall); }
     public string Action { get => action; set => Set(ref action, value); }
 }
 
@@ -52,7 +53,7 @@ public sealed partial class MainViewModel
         {
             foreach (var r in KeyboardRows) r.IsSelected = (p as string) == "custom" ? r.Info.IsCustom : false;
         }, _ => IsIdle && KeyboardRows.Count > 0);
-        InstallLayoutsCommand = new RelayCommand(async () => await InstallLayoutsAsync(), () => IsIdle && KeyboardRestoreRows.Any(r => r.Selected));
+        InstallLayoutsCommand = new RelayCommand(async () => await InstallLayoutsAsync(null), () => IsIdle && KeyboardRestoreRows.Any(r => r.Selected));
         RestoreLanguagesCommand = new RelayCommand(async () => await RestoreLanguagesAsync(), () => IsIdle && loadedPackage?.WindowsSettings?.Items.Any(i => i.Kind == SettingKinds.LanguageList) == true);
         SaveKlcCommand = new RelayCommand(() => SaveKlcFiles(openFolder: true), () => IsIdle && KlcLayouts().Any(l => l.GeneratedKlc != null));
         OpenInMsklcCommand = new RelayCommand(OpenInMsklc, () => IsIdle && KlcLayouts().Any(l => l.GeneratedKlc != null || l.KlcSources.Count > 0));
@@ -176,16 +177,20 @@ public sealed partial class MainViewModel
         foreach (var l in loadedPackage.Keyboard.Layouts.Where(l => l.Selected && l.IsCustom))
         {
             var plan = kr.Plan(loadedPackage, l);
-            KeyboardRestoreRows.Add(new KeyboardRestoreRow { Info = l, Action = plan.Description, Selected = plan.Method is KeyboardInstallMethod.Msi or KeyboardInstallMethod.Dll or KeyboardInstallMethod.BuildFromKlc });
+            bool can = plan.Method is KeyboardInstallMethod.Msi or KeyboardInstallMethod.Dll or KeyboardInstallMethod.BuildFromKlc;
+            KeyboardRestoreRows.Add(new KeyboardRestoreRow { Info = l, Action = plan.Description, CanInstall = can, Selected = can });
         }
     }
 
     KeyboardRestore NewKeyboardRestore() => new(Processes, Registry, new ElevatedPowerShell(), FindMsklc());
 
-    async Task InstallLayoutsAsync()
+    /// <summary>Installs the ticked layouts, or only the given ones (right-click → Install only this).</summary>
+    async Task InstallLayoutsAsync(List<KeyboardRestoreRow>? only = null)
     {
         if (loadedPackage == null) return;
-        var rows = KeyboardRestoreRows.Where(r => r.Selected).ToList();
+        var rows = only ?? KeyboardRestoreRows.Where(r => r.Selected).ToList();
+        if (rows.Count == 0) return;
+        var keptOff = KeyboardRestoreRows.Where(r => !r.Selected).Select(r => r.Info.Klid).ToHashSet();
         if (!Confirm($"Install {rows.Count} keyboard layout(s)?\n\n" + string.Join("\n", rows.Select(r => "• " + r.Info.LayoutText + ": " + r.Action)) +
                      "\n\nWindows will ask for administrator permission. A restart may be needed before the layout appears.")) return;
         var pkg = loadedPackage; var kr = NewKeyboardRestore();
@@ -201,6 +206,7 @@ public sealed partial class MainViewModel
             }
         });
         RefreshKeyboardRestore();
+        foreach (var r in KeyboardRestoreRows) if (keptOff.Contains(r.Info.Klid)) r.Selected = false;
         Inform(string.Join("\n", results) + "\n\nNext: Restore language list and keyboard order.");
     }
 

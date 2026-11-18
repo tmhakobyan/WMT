@@ -1,6 +1,6 @@
-## Workstation Migration Toolkit 4.1.0-beta
+## Workstation Migration Toolkit 4.2.0-beta
 
-**Ներբեռնեք `WMT-4.1.0-beta.zip` ֆայլը** (ոչ թե «Source code»)։ Բացեք ZIP-ը (աջ սեղմում → Extract All) և կրկնակի սեղմեք `Launch-WMT.cmd`։
+**Ներբեռնեք `WMT-4.2.0-beta.zip` ֆայլը** (ոչ թե «Source code»)։ Բացեք ZIP-ը (աջ սեղմում → Extract All) և կրկնակի սեղմեք `Launch-WMT.cmd`։
 Եթե Windows-ը ցույց տա «Windows protected your PC», սեղմեք **More info → Run anyway** (ծրագիրը ստորագրված չէ)։
 
 Ներսում՝ `README.html` (հայերեն օգնություն), `KNOWN-ISSUES.md`, `TEST-REPORT.md` (իրականում գործարկված թեստերի արդյունքներ), `SHA256SUMS.txt`։

@@ -1,4 +1,4 @@
-param([string]$Version = '4.1.0-beta', [string]$BuildId = 'local')
+param([string]$Version = '4.2.0-beta', [string]$BuildId = 'local')
 $ErrorActionPreference = 'Stop'
 $root = Split-Path $PSScriptRoot -Parent
 $name = "WMT-$Version"

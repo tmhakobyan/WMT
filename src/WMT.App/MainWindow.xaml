@@ -19,7 +19,7 @@
             <MenuItem Header="About" Click="OnAbout" />
         </Menu>
 
-        <TabControl Grid.Row="1" Margin="6,4,6,2" x:Name="MainTabs">
+        <TabControl Grid.Row="1" Margin="6,4,6,2" x:Name="MainTabs" SelectedIndex="{Binding MainTabIndex}">
             <!-- ============================ SOFTWARE ============================ -->
             <TabItem Header="Software">
                 <Grid Margin="6" IsEnabled="{Binding IsIdle}">
@@ -207,10 +207,17 @@
                         <TextBlock Text="Restore from package (on the new Windows; open the package in Backup &amp; Recovery first):" FontWeight="SemiBold" VerticalAlignment="Center" Margin="0,0,8,6" />
                         <Button Content="Install selected layouts" Command="{Binding InstallLayoutsCommand}" />
                         <Button Content="Restore language list and keyboard order" Command="{Binding RestoreLanguagesCommand}" />
+                        <Button Content="Select all" Command="{Binding ListSelectCommand}" CommandParameter="keyboard:all" />
+                        <Button Content="Clear" Command="{Binding ListSelectCommand}" CommandParameter="keyboard:none" />
+                        <TextBlock Text="Right-click a layout → Install only this item" Foreground="Gray" VerticalAlignment="Center" Margin="2,0,0,6" />
                     </WrapPanel>
-                    <DataGrid Grid.Row="5" ItemsSource="{Binding KeyboardRestoreRows}">
+                    <DataGrid Grid.Row="5" ItemsSource="{Binding KeyboardRestoreRows}" x:Name="KeyboardRestoreGrid">
                         <DataGrid.Columns>
-                            <DataGridCheckBoxColumn Header="Install" Width="55" Binding="{Binding Selected, UpdateSourceTrigger=PropertyChanged}" />
+                            <DataGridTemplateColumn Header="Install" Width="55">
+                                <DataGridTemplateColumn.CellTemplate>
+                                    <DataTemplate><CheckBox IsChecked="{Binding Selected, UpdateSourceTrigger=PropertyChanged}" IsEnabled="{Binding CanInstall}" HorizontalAlignment="Center" /></DataTemplate>
+                                </DataGridTemplateColumn.CellTemplate>
+                            </DataGridTemplateColumn>
                             <DataGridTextColumn Header="Layout" Width="*" IsReadOnly="True" Binding="{Binding Info.LayoutText, Mode=OneWay}" />
                             <DataGridTextColumn Header="KLID" Width="80" IsReadOnly="True" Binding="{Binding Info.Klid, Mode=OneWay}" />
                             <DataGridTextColumn Header="What will happen" Width="2*" IsReadOnly="True" Binding="{Binding Action, Mode=OneWay}" />
@@ -262,12 +269,19 @@
                             <Button Content="Dry run settings" Command="{Binding SettingsDryRunCommand}" />
                             <Button Content="Apply selected settings" Command="{Binding ApplySettingsCommand}" FontWeight="SemiBold" />
                             <Button Content="Undo last settings restore" Command="{Binding UndoSettingsCommand}" />
+                            <Button Content="Select all" Command="{Binding ListSelectCommand}" CommandParameter="settings:all" />
+                            <Button Content="Clear" Command="{Binding ListSelectCommand}" CommandParameter="settings:none" />
+                            <TextBlock Text="Right-click a setting → Apply only this item" Foreground="Gray" VerticalAlignment="Center" Margin="2,0,0,6" />
                         </WrapPanel>
                         <TextBlock Text="{Binding SettingsRestoreStatus}" TextWrapping="Wrap" />
                     </StackPanel>
-                    <DataGrid Grid.Row="5" ItemsSource="{Binding SettingActionRows}">
+                    <DataGrid Grid.Row="5" ItemsSource="{Binding SettingActionRows}" x:Name="SettingsActionsGrid">
                         <DataGrid.Columns>
-                            <DataGridCheckBoxColumn Header="Apply" Width="50" Binding="{Binding Selected, UpdateSourceTrigger=PropertyChanged}" />
+                            <DataGridTemplateColumn Header="Apply" Width="50">
+                                <DataGridTemplateColumn.CellTemplate>
+                                    <DataTemplate><CheckBox IsChecked="{Binding Selected, UpdateSourceTrigger=PropertyChanged}" IsEnabled="{Binding CanApply}" HorizontalAlignment="Center" /></DataTemplate>
+                                </DataGridTemplateColumn.CellTemplate>
+                            </DataGridTemplateColumn>
                             <DataGridTextColumn Header="Group" Width="120" IsReadOnly="True" Binding="{Binding Action.Group, Mode=OneWay}" />
                             <DataGridTextColumn Header="Setting" Width="*" IsReadOnly="True" Binding="{Binding Action.Name, Mode=OneWay}" />
                             <DataGridTextColumn Header="What will happen" Width="2*" IsReadOnly="True" Binding="{Binding Action.Description, Mode=OneWay}" />
@@ -552,16 +566,24 @@
                         <Grid Margin="6">
                             <Grid.RowDefinitions>
                                 <RowDefinition Height="Auto" />
-                                <RowDefinition Height="80" MinHeight="50" />
                                 <RowDefinition Height="Auto" />
+                                <RowDefinition Height="78" MinHeight="50" />
                                 <RowDefinition Height="Auto" />
-                                <RowDefinition Height="*" MinHeight="120" />
+                                <RowDefinition Height="*" MinHeight="140" />
                                 <RowDefinition Height="Auto" />
-                                <RowDefinition Height="105" MinHeight="60" />
+                                <RowDefinition Height="100" MinHeight="60" />
                             </Grid.RowDefinitions>
-                            <TextBlock Grid.Row="0" TextWrapping="Wrap" Margin="0,0,0,4"
-                                       Text="Run this on the NEW Windows after installing your programs. 1) Choose the target profile for every source profile. 2) Check prerequisites. 3) Dry run. 4) Untick what you do not want. 5) Restore. Nothing is overwritten unless you allow it; registry values are applied only when ticked one by one." />
-                            <DataGrid Grid.Row="1" ItemsSource="{Binding ProfileMapRows}">
+                            <Border Grid.Row="0" Background="#FFF2F6FB" BorderBrush="#FFB7C9E2" BorderThickness="1" Padding="6,4,6,0" Margin="0,0,0,6">
+                                <WrapPanel>
+                                    <TextBlock Text="On the new Windows, in this order:  A. install your programs (Office, Python…)  →" FontWeight="SemiBold" VerticalAlignment="Center" Margin="0,0,6,6" />
+                                    <Button Content="B. Keyboard layouts" Command="{Binding GoToTabCommand}" CommandParameter="keyboard" ToolTip="Opens the Keyboard Layouts tab" />
+                                    <Button Content="C. Windows settings" Command="{Binding GoToTabCommand}" CommandParameter="settings" ToolTip="Opens the Windows Settings tab" />
+                                    <TextBlock Text="→  D. files: steps 1–4 on this page  →  E. Python environments (last list below)" FontWeight="SemiBold" VerticalAlignment="Center" Margin="0,0,0,6" />
+                                </WrapPanel>
+                            </Border>
+                            <TextBlock Grid.Row="1" FontWeight="SemiBold" Margin="0,0,0,3" TextWrapping="Wrap"
+                                       Text="Step 1. For every old account choose where its files go on this computer (normally your own profile, e.g. C:\Users\YourName):" />
+                            <DataGrid Grid.Row="2" ItemsSource="{Binding ProfileMapRows}">
                                 <DataGrid.Columns>
                                     <DataGridTextColumn Header="Source account" Width="*" IsReadOnly="True" Binding="{Binding Source.Account, Mode=OneWay}" />
                                     <DataGridTextColumn Header="Source profile path" Width="*" IsReadOnly="True" Binding="{Binding Source.ProfilePath, Mode=OneWay}" />
@@ -575,16 +597,24 @@
                                     </DataGridTemplateColumn>
                                 </DataGrid.Columns>
                             </DataGrid>
-                            <WrapPanel Grid.Row="2" Margin="0,6,0,0">
-                                <TextBlock Text="Drive mapping (e.g. D:=E:):" VerticalAlignment="Center" Margin="0,0,4,6" />
-                                <TextBox Width="120" Margin="0,0,10,6" Text="{Binding DriveMap, UpdateSourceTrigger=PropertyChanged}" />
-                                <CheckBox Content="Allow overwrite (previous file is saved)" IsChecked="{Binding AllowOverwrite}" VerticalAlignment="Center" Margin="0,0,10,6" />
-                                <Button Content="Check prerequisites" Command="{Binding PrereqCommand}" />
-                                <Button Content="Dry run" Command="{Binding DryRunCommand}" />
-                                <Button Content="Restore selected" Command="{Binding RestoreCommand}" FontWeight="SemiBold" />
-                                <Button Content="Undo last restore" Command="{Binding UndoRestoreCommand}" />
-                            </WrapPanel>
-                            <TextBlock Grid.Row="3" Text="{Binding RestoreStatus}" TextWrapping="Wrap" FontWeight="SemiBold" Margin="0,0,0,4" />
+                            <StackPanel Grid.Row="3" Margin="0,6,0,0">
+                                <WrapPanel>
+                                    <TextBlock Text="Step 2." FontWeight="SemiBold" VerticalAlignment="Center" Margin="0,0,4,6" />
+                                    <Button Content="Dry run" Command="{Binding DryRunCommand}" FontWeight="SemiBold" ToolTip="Shows what would be restored. Nothing is changed." />
+                                    <TextBlock Text="Step 3. review the lists below    Step 4." FontWeight="SemiBold" VerticalAlignment="Center" Margin="6,0,4,6" />
+                                    <Button Content="Restore selected" Command="{Binding RestoreCommand}" FontWeight="SemiBold" />
+                                    <Button Content="Undo last restore" Command="{Binding UndoRestoreCommand}" />
+                                    <Button Content="Check prerequisites" Command="{Binding PrereqCommand}" ToolTip="Optional: 'Restore selected' runs this check automatically." />
+                                </WrapPanel>
+                                <WrapPanel>
+                                    <TextBlock Text="Options:" Foreground="Gray" VerticalAlignment="Center" Margin="0,0,6,6" />
+                                    <TextBlock Text="Drive mapping (e.g. D:=E:):" VerticalAlignment="Center" Margin="0,0,4,6" />
+                                    <TextBox Width="120" Margin="0,0,10,6" Text="{Binding DriveMap, UpdateSourceTrigger=PropertyChanged}" />
+                                    <CheckBox Content="Allow overwrite (previous file is saved)" IsChecked="{Binding AllowOverwrite}" VerticalAlignment="Center" Margin="0,0,10,6" />
+                                </WrapPanel>
+                                <TextBlock Text="{Binding RestoreNextStep}" TextWrapping="Wrap" Foreground="#FF1F4E99" FontWeight="SemiBold" Margin="0,0,0,3" />
+                                <TextBlock Text="{Binding RestoreStatus}" TextWrapping="Wrap" Margin="0,0,0,4" />
+                            </StackPanel>
                             <TabControl Grid.Row="4">
                                 <TabItem Header="Prerequisites">
                                     <DataGrid ItemsSource="{Binding PrerequisiteIssues}" IsReadOnly="True">
@@ -597,29 +627,51 @@
                                     </DataGrid>
                                 </TabItem>
                                 <TabItem Header="Files (dry run)">
-                                    <DataGrid ItemsSource="{Binding RestoreFileOps}">
+                                    <DockPanel>
+                                        <WrapPanel DockPanel.Dock="Top" Margin="0,4,0,0">
+                                            <Button Content="Select all" Command="{Binding ListSelectCommand}" CommandParameter="files:all" />
+                                            <Button Content="Clear" Command="{Binding ListSelectCommand}" CommandParameter="files:none" />
+                                            <TextBlock Text="Only 'New file' and 'Replace' rows can be ticked. Right-click a row → Restore only this item (also offers to replace a file that exists)." Foreground="Gray" TextWrapping="Wrap" VerticalAlignment="Center" Margin="2,0,0,6" />
+                                        </WrapPanel>
+                                    <DataGrid ItemsSource="{Binding RestoreFileRows}" x:Name="RestoreFilesGrid">
                                         <DataGrid.Columns>
-                                            <DataGridCheckBoxColumn Header="Restore" Width="60" Binding="{Binding Selected, UpdateSourceTrigger=PropertyChanged}" />
-                                            <DataGridTextColumn Header="Action" Width="100" IsReadOnly="True" Binding="{Binding Action, Mode=OneWay}" />
+                                            <DataGridTemplateColumn Header="Restore" Width="60">
+                                                <DataGridTemplateColumn.CellTemplate>
+                                                    <DataTemplate><CheckBox IsChecked="{Binding Selected, UpdateSourceTrigger=PropertyChanged}" IsEnabled="{Binding CanRestore}" HorizontalAlignment="Center" /></DataTemplate>
+                                                </DataGridTemplateColumn.CellTemplate>
+                                            </DataGridTemplateColumn>
+                                            <DataGridTextColumn Header="Action" Width="115" IsReadOnly="True" Binding="{Binding ActionText, Mode=OneWay}" />
                                             <DataGridTextColumn Header="Target" Width="2*" IsReadOnly="True" Binding="{Binding Target, Mode=OneWay}" />
                                             <DataGridTextColumn Header="Category" Width="*" IsReadOnly="True" Binding="{Binding Category, Mode=OneWay}" />
                                             <DataGridTextColumn Header="Reason" Width="*" IsReadOnly="True" Binding="{Binding Reason, Mode=OneWay}" />
                                         </DataGrid.Columns>
                                     </DataGrid>
+                                    </DockPanel>
                                 </TabItem>
                                 <TabItem Header="Registry (review)">
-                                    <DataGrid ItemsSource="{Binding RestoreRegistryOps}">
+                                    <DockPanel>
+                                        <WrapPanel DockPanel.Dock="Top" Margin="0,4,0,0">
+                                            <Button Content="Select all" Command="{Binding ListSelectCommand}" CommandParameter="registry:all" />
+                                            <Button Content="Clear" Command="{Binding ListSelectCommand}" CommandParameter="registry:none" />
+                                            <TextBlock Text="Program settings from the old Windows (HKCU). Nothing is ticked by default — tick only what you need. Right-click a row → Apply only this item." Foreground="Gray" TextWrapping="Wrap" VerticalAlignment="Center" Margin="2,0,0,6" />
+                                        </WrapPanel>
+                                    <DataGrid ItemsSource="{Binding RestoreRegistryRows}" x:Name="RestoreRegistryGrid">
                                         <DataGrid.Columns>
-                                            <DataGridCheckBoxColumn Header="Apply" Width="50" Binding="{Binding Selected, UpdateSourceTrigger=PropertyChanged}" />
+                                            <DataGridTemplateColumn Header="Apply" Width="50">
+                                                <DataGridTemplateColumn.CellTemplate>
+                                                    <DataTemplate><CheckBox IsChecked="{Binding Selected, UpdateSourceTrigger=PropertyChanged}" IsEnabled="{Binding CanApply}" HorizontalAlignment="Center" /></DataTemplate>
+                                                </DataGridTemplateColumn.CellTemplate>
+                                            </DataGridTemplateColumn>
                                             <DataGridTextColumn Header="Key (HKCU)" Width="2*" IsReadOnly="True" Binding="{Binding KeyPath, Mode=OneWay}" />
                                             <DataGridTextColumn Header="Value" Width="*" IsReadOnly="True" Binding="{Binding ValueName, Mode=OneWay}" />
                                             <DataGridTextColumn Header="Type" Width="70" IsReadOnly="True" Binding="{Binding Type, Mode=OneWay}" />
                                             <DataGridTextColumn Header="Current (old)" Width="*" IsReadOnly="True" Binding="{Binding OldValue, Mode=OneWay}" />
                                             <DataGridTextColumn Header="From backup (new)" Width="*" IsReadOnly="True" Binding="{Binding NewValue, Mode=OneWay}" />
-                                            <DataGridTextColumn Header="Blocked" Width="60" IsReadOnly="True" Binding="{Binding Blocked, Mode=OneWay}" />
+                                            <DataGridTextColumn Header="Blocked" Width="60" IsReadOnly="True" Binding="{Binding BlockedText, Mode=OneWay}" />
                                             <DataGridTextColumn Header="Warning" Width="1.5*" IsReadOnly="True" Binding="{Binding Warning, Mode=OneWay}" />
                                         </DataGrid.Columns>
                                     </DataGrid>
+                                    </DockPanel>
                                 </TabItem>
                                 <TabItem Header="Python environments">
                                     <DockPanel>
