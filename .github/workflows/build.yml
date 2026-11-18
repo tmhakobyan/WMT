@@ -17,6 +17,10 @@ jobs:
         with:
           dotnet-version: '8.0.x'
 
+      - name: Quick consistency check (Help labels, version)
+        shell: pwsh
+        run: python build/check-consistency.py
+
       - name: Get MSKLC compiler (only for the .klc round-trip test)
         continue-on-error: true
         shell: pwsh
