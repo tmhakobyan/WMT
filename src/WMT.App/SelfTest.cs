@@ -222,7 +222,20 @@ public sealed class SelfTest
         if (Directory.Exists(target)) Directory.Delete(target, true);
         Directory.CreateDirectory(target);
         foreach (var r in vm.ProfileMapRows) r.Target = target;
-        Check("RST hint asks for a new dry run after profile change", vm.RestoreNextStep.Contains("Dry run"), vm.RestoreNextStep);
+        if (vm.ProfileMapRows.Count > 0)
+            Check("RST hint asks for a new dry run after profile change", vm.RestoreNextStep.Contains("Dry run"), vm.RestoreNextStep);
+        // Simulate lost files: move three already-identical fixture files away so the dry run proposes them as "New file".
+        var aside = Path.Combine(dir, "restore-aside");
+        if (Directory.Exists(aside)) Directory.Delete(aside, true);
+        Directory.CreateDirectory(aside);
+        var moved = new List<(string From, string To)>();
+        foreach (var f in vm.RestoreFileRows.Where(f => f.Op.Action == RestoreAction.SkipIdentical && f.Op.Target != null
+                     && f.Op.Target.StartsWith(Path.GetFullPath(dir), StringComparison.OrdinalIgnoreCase)).Take(3))
+        {
+            var to = Path.Combine(aside, moved.Count + "_" + Path.GetFileName(f.Op.Target!));
+            File.Move(f.Op.Target!, to);
+            moved.Add((f.Op.Target!, to));
+        }
         await vm.DryRunCommandExecuteAsync();
         int restorable = vm.RestoreFileRows.Count(f => f.CanRestore);
         vm.SetAll("files", false);
@@ -231,16 +244,21 @@ public sealed class SelfTest
         Check("RST Select all / Clear", restorable > 1 && cleared && vm.RestoreFileRows.Count(f => f.Selected) == restorable && vm.RestoreFileRows.Where(f => !f.CanRestore).All(f => !f.Selected),
             $"{restorable} restorable of {vm.RestoreFileRows.Count}");
         Check("RST right-click menu attached", w.FilesGrid.ContextMenu?.Items.Count == 7);
-        var one = vm.RestoreFileRows.First(f => f.CanRestore);
-        var other = vm.RestoreFileRows.Last(f => f.CanRestore);
-        other.Selected = false;
-        await vm.RunOnlyAsync("files", new List<object> { one });
-        Check("RST restore only this item", File.Exists(one.Op.Target!) && one.Op.Reason == "Restored just now" && !one.Selected
-              && vm.RestoreFileRows.Count(f => f.Op.Reason == "Restored just now") == 1 && !other.Selected && vm.RestoreFileRows.Count(f => f.Selected) == restorable - 2,
-            $"{one.Op.Target} | {vm.RestoreStatus}");
-        await Shot("11a-restore-only-this");
-        vm.UndoRestoreCommand.Execute(null);
-        Check("RST undo removes the restored file", !File.Exists(one.Op.Target!), vm.RestoreStatus);
+        if (restorable < 2) Check("RST restore only this item", false, "no restorable rows");
+        else
+        {
+            var one = vm.RestoreFileRows.First(f => f.CanRestore);
+            var other = vm.RestoreFileRows.Last(f => f.CanRestore);
+            other.Selected = false;
+            await vm.RunOnlyAsync("files", new List<object> { one });
+            Check("RST restore only this item", File.Exists(one.Op.Target!) && one.Op.Reason == "Restored just now" && !one.Selected
+                  && vm.RestoreFileRows.Count(f => f.Op.Reason == "Restored just now") == 1 && !other.Selected && vm.RestoreFileRows.Count(f => f.Selected) == restorable - 2,
+                $"{one.Op.Target} | {vm.RestoreStatus}");
+            await Shot("11a-restore-only-this");
+            vm.UndoRestoreCommand.Execute(null);
+            Check("RST undo removes the restored file", !File.Exists(one.Op.Target!), vm.RestoreStatus);
+        }
+        foreach (var (from, to) in moved) if (!File.Exists(from)) File.Move(to, from);
 
         var help = new HelpWindow { Owner = w };
         help.Show();
